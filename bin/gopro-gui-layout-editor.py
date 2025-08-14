@@ -86,6 +86,10 @@ class LayoutEditor:
         )
         # Empaquetar encima del botón guardar
         self.rerender_btn.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 10))
+
+        # Botón Deshacer (persistente)
+        self.undo_btn = tk.Button(self.side_panel, text="Deshacer (Ctrl+Z)", command=self.undo, bg="#666", fg="white")
+        self.undo_btn.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 5))
         
         # Información del elemento seleccionado
         self.selection_label = tk.Label(self.side_panel, text="Ningún elemento seleccionado", 
@@ -102,11 +106,25 @@ class LayoutEditor:
         self._dragging = False
         self._temp_rects = []  # Rectángulos temporales durante arrastre
         
+        # Pila de deshacer (almacena snapshots XML como strings)
+        self._undo_stack = []
+        self._undo_limit = 50
+
         # Eventos del mouse
         self.canvas.bind('<Button-1>', self.on_click)
         self.canvas.bind('<B1-Motion>', self.on_drag)
         self.canvas.bind('<ButtonRelease-1>', self.on_release)
         self.canvas.bind('<MouseWheel>', self.on_mousewheel)  # Windows
+        # Tecla Delete para borrar componente seleccionado
+        try:
+            self.master.bind('<Delete>', self.on_delete_key)
+        except Exception:
+            pass
+        # Tecla Ctrl+Z para deshacer
+        try:
+            self.master.bind('<Control-z>', self.on_undo_key)
+        except Exception:
+            pass
         
         # Realizar renderizado inicial
         self.master.after(100, self.render_layout)
@@ -1535,6 +1553,13 @@ class LayoutEditor:
             outline_width_spin = tk.Spinbox(outline_width_frame, from_=0, to=20, textvariable=outline_width_var, width=6, command=lambda: self.update_attribute("outline_width", outline_width_var.get(), render=True))
             outline_width_spin.pack(side=tk.LEFT, padx=5)
         
+        # Botón para eliminar el componente seleccionado
+        def _del():
+            self.delete_selected_component()
+
+        del_btn = tk.Button(props_frame, text="Eliminar componente", command=_del, bg="#CC4444", fg="white")
+        del_btn.pack(fill=tk.X, pady=5)
+
         # Botón para ver/editar todos los atributos
         all_attrs_btn = tk.Button(
             props_frame, text="Ver todos los atributos", 
@@ -1669,6 +1694,66 @@ class LayoutEditor:
         
         tk.Button(button_frame, text="Aplicar", command=apply_changes).pack(side="right", padx=5)
         tk.Button(button_frame, text="Cancelar", command=attr_window.destroy).pack(side="right", padx=5)
+
+    def on_delete_key(self, event):
+        """Handler para la tecla Delete"""
+        self.delete_selected_component()
+
+    def delete_selected_component(self):
+        """Elimina el componente seleccionado del árbol XML y re-renderiza."""
+        if not self.selected:
+            return
+
+        elem = self.selected['element']
+        parent = self.find_parent(elem)
+        if parent is None:
+            messagebox.showwarning("No se puede eliminar", "No se pudo encontrar el elemento padre.")
+            return
+
+        # Preguntar confirmación
+        if not messagebox.askyesno("Eliminar componente", f"¿Eliminar este componente ({elem.attrib.get('type','')})?"):
+            return
+
+        # Guardar estado para poder deshacer
+        try:
+            self.push_undo_state()
+        except Exception:
+            pass
+
+        # Eliminar del árbol
+        try:
+            parent.remove(elem)
+        except Exception as e:
+            print(f"[ERROR] No se pudo eliminar elemento: {e}")
+            messagebox.showerror("Error", f"No se pudo eliminar el elemento: {e}")
+            return
+        # Después de eliminar, si el padre es un <translate> y quedó vacío, eliminarlo también.
+        try:
+            cur = parent
+            # Recorrer hacia arriba eliminando <translate> vacíos
+            while cur is not None and cur.tag == 'translate' and len(list(cur)) == 0:
+                grand = self.find_parent(cur)
+                if grand is None:
+                    # No eliminar la raíz
+                    break
+                try:
+                    grand.remove(cur)
+                    print(f"[INFO] Eliminado translate vacío en x={cur.attrib.get('x','?')} y={cur.attrib.get('y','?')}")
+                except Exception as e:
+                    print(f"[WARN] No se pudo eliminar translate vacío: {e}")
+                    break
+                # Continuar hacia arriba
+                cur = grand
+        except Exception as e:
+            print(f"[WARN] Error al limpiar translates vacíos: {e}")
+
+        # Limpiar selección
+        self.selected = None
+        self.selected_translate = None
+
+        # Re-render y re-analizar
+        self.rerender_layout()
+        print("[INFO] Componente eliminado y layout re-renderizado")
     
     def update_attribute(self, attr, value, render=False):
         """Actualiza un atributo del elemento seleccionado"""
@@ -1680,6 +1765,13 @@ class LayoutEditor:
             value = str(value)
         
         # Actualizar el atributo en el XML
+        # Si este cambio implica re-render y es persistente, guardar snapshot antes
+        if render:
+            try:
+                self.push_undo_state()
+            except Exception:
+                pass
+
         self.selected["element"].set(attr, value)
         
         if render:
@@ -1704,9 +1796,15 @@ class LayoutEditor:
         if not self.selected:
             return
         
+        # Guardar snapshot antes de cambiar texto
+        try:
+            self.push_undo_state()
+        except Exception:
+            pass
+
         # Actualizar texto en el XML
         self.selected["element"].text = text
-        
+
         # Re-renderizar el layout para ver los cambios inmediatamente
         self.rerender_layout()
     
@@ -1843,9 +1941,46 @@ class LayoutEditor:
         
         # Marcar que estamos arrastrando
         self._dragging = True
-        
         # Actualizar visualización sin re-renderizar
         self.update_component_visuals()
+
+    def push_undo_state(self):
+        """Guarda un snapshot del XML actual en la pila de deshacer."""
+        try:
+            xml_str = ET.tostring(self.root, encoding='unicode')
+            self._undo_stack.append(xml_str)
+            # Limitar el tamaño de la pila
+            if len(self._undo_stack) > self._undo_limit:
+                self._undo_stack = self._undo_stack[-self._undo_limit:]
+            print(f"[INFO] Snapshot guardado. Pila deshacer={len(self._undo_stack)}")
+        except Exception as e:
+            print(f"[WARN] No se pudo crear snapshot de undo: {e}")
+
+    def undo(self):
+        """Restaura el último snapshot si existe."""
+        if not self._undo_stack:
+            print("[INFO] Pila de deshacer vacía")
+            return
+        try:
+            last = self._undo_stack.pop()
+            # Parsear y reemplazar el árbol actual
+            tree = ET.ElementTree(ET.fromstring(last))
+            self.tree = tree
+            self.root = self.tree.getroot()
+            # Re-renderizar y re-analizar
+            self.render_layout()
+            self.parse_components()
+            self.selected = None
+            self.selected_translate = None
+            self.update_component_visuals()
+            self.update_properties_panel()
+            print("[INFO] Undo aplicado")
+        except Exception as e:
+            print(f"[ERROR] Fallo al aplicar undo: {e}")
+
+    def on_undo_key(self, event):
+        """Handler de tecla Ctrl+Z"""
+        self.undo()
 
     def _on_rect_click(self, index, event):
         """Handler para clicks en rectángulos de componente: selecciona el componente correspondiente."""
@@ -1853,10 +1988,8 @@ class LayoutEditor:
             return
         item = self.items[index]
         self.selected = item
-        if "translate" in item and item["translate"] is not None:
-            self.selected_translate = item["translate"]
-        else:
-            self.selected_translate = None
+        # Guardar referencia al translate padre si existe
+        self.selected_translate = item.get("translate", None)
 
         # Guardar offset para arrastrar
         x = self.canvas.canvasx(event.x)
@@ -1885,6 +2018,12 @@ class LayoutEditor:
         
         # Para iconos, que deben tener sus propias coordenadas
         if elem_type == "icon":
+            # Guardar estado para undo
+            try:
+                self.push_undo_state()
+            except Exception:
+                pass
+
             # Los iconos deben tener x e y directamente
             self.selected["element"].set("x", str(int(new_x)))
             self.selected["element"].set("y", str(int(new_y)))
@@ -1898,6 +2037,11 @@ class LayoutEditor:
             print(f"[INFO] Actualizado posición del icono a x={int(new_x)}, y={int(new_y)}")
         # Para todos los demás componentes (incluidos textos), modificar el translate padre
         elif self.selected_translate is not None:
+            # Guardar estado para undo
+            try:
+                self.push_undo_state()
+            except Exception:
+                pass
             # Calcular el delta de movimiento desde la posición original
             delta_x = new_x - self.selected["abs_x"]
             delta_y = new_y - self.selected["abs_y"]
