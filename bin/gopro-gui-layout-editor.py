@@ -4,6 +4,17 @@ import xml.etree.ElementTree as ET
 import os
 from PIL import Image, ImageTk
 import traceback
+import copy
+
+# Intentar detectar si libraqm está disponible
+LIBRAQM_AVAILABLE = False
+try:
+    from PIL import features
+    LIBRAQM_AVAILABLE = features.check_feature('raqm')
+    print(f"[INFO] Soporte libraqm disponible: {LIBRAQM_AVAILABLE}")
+except (ImportError, AttributeError):
+    # Pillow antiguo o característica no disponible
+    print("[INFO] No se pudo detectar soporte libraqm, asumiendo no disponible")
 
 def seleccionar_xml():
     root = tk.Tk()
@@ -113,8 +124,13 @@ class LayoutEditor:
             print(f"[INFO] Usando fuente: {font_path}")
             font = load_font(font_path).font_variant(size=16)
             
+            # Usar la fecha/hora actual para asegurar que los componentes datetime muestren datos actuales
+            import datetime
+            current_time = datetime.datetime.now()
+            
             rng = random.Random(12345)
-            timeseries = fake.fake_framemeta(timedelta(minutes=5), step=timedelta(seconds=1), rng=rng, point_step=0.0001)
+            timeseries = fake.fake_framemeta(timedelta(minutes=5), step=timedelta(seconds=1), rng=rng, 
+                                             point_step=0.0001, start_timestamp=int(current_time.timestamp()))
             
             # Configurar MapRenderer
             config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -134,6 +150,15 @@ class LayoutEditor:
                 with open(temp_xml, "w", encoding="utf-8") as f:
                     f.write(xml_str)
                 print(f"[DEBUG] XML temporal guardado en {temp_xml}")
+                
+                # Si libraqm no está disponible, necesitamos crear una copia del árbol XML y eliminar
+                # atributos que requieren libraqm para evitar errores de renderizado
+                if not LIBRAQM_AVAILABLE:
+                    print("[INFO] Libraqm no disponible, eliminando atributos de dirección de texto temporalmente para renderizado")
+                    temp_tree = copy.deepcopy(self.tree)
+                    temp_root = temp_tree.getroot()
+                    self.remove_libraqm_attributes(temp_root)
+                    xml_str = ET.tostring(temp_root, encoding="unicode")
                 
                 # Renderizar desde el string XML, no desde el archivo
                 layout = layout_from_xml(xml_str, renderer, timeseries, font, NoPrivacyZone())
@@ -509,6 +534,144 @@ class LayoutEditor:
             )
             size_spin.pack(side=tk.LEFT, padx=5)
             
+            # Color RGB
+            color_frame = tk.Frame(props_frame, bg="#222")
+            color_frame.pack(fill=tk.X, pady=5)
+            tk.Label(color_frame, text="Color RGB:", fg="white", bg="#222").pack(anchor=tk.W)
+            
+            # Frame para entrada y vista previa del color
+            rgb_input_frame = tk.Frame(color_frame, bg="#222")
+            rgb_input_frame.pack(fill=tk.X, pady=2)
+            
+            # Entrada de texto para el color
+            rgb_var = tk.StringVar(value=elem.attrib.get("rgb", "255,255,255"))
+            rgb_entry = tk.Entry(rgb_input_frame, textvariable=rgb_var, width=15)
+            rgb_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            rgb_var.trace_add("write", lambda *args: self.update_attribute("rgb", rgb_var.get()))
+            
+            # Crear muestra de color
+            color_preview = tk.Frame(rgb_input_frame, width=30, height=20, bg=self.rgb_to_hex(rgb_var.get()))
+            color_preview.pack(side=tk.LEFT, padx=5)
+            
+            # Botón para selector de color
+            color_button = tk.Button(rgb_input_frame, text="Elegir color", 
+                                     command=lambda: self.open_color_picker(rgb_var, color_preview),
+                                     bg="#336699", fg="white")
+            color_button.pack(side=tk.LEFT, padx=5)
+            
+            # Control de transparencia (alpha) para RGB
+            alpha_frame = tk.Frame(color_frame, bg="#222")
+            alpha_frame.pack(fill=tk.X, pady=2)
+            tk.Label(alpha_frame, text="Transparencia:", fg="white", bg="#222").pack(side=tk.LEFT)
+            
+            # Determinar si ya hay un valor alpha en el RGB
+            rgb_parts = rgb_var.get().split(',')
+            has_alpha = len(rgb_parts) >= 4
+            alpha_value = int(rgb_parts[3]) if has_alpha else 255
+            
+            # Crear control deslizante para transparencia
+            alpha_var = tk.IntVar(value=alpha_value)
+            alpha_scale = tk.Scale(alpha_frame, from_=0, to=255, orient=tk.HORIZONTAL, 
+                                variable=alpha_var, bg="#333", fg="white",
+                                highlightbackground="#222", troughcolor="#444",
+                                command=lambda val: self.update_rgb_alpha(rgb_var, color_preview, int(val)))
+            alpha_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+            
+            # Etiqueta para mostrar el valor actual
+            alpha_label = tk.Label(alpha_frame, text=f"{alpha_value}", width=3, fg="white", bg="#222")
+            alpha_label.pack(side=tk.LEFT)
+            
+            # Actualizar la etiqueta cuando cambie el valor
+            def update_alpha_label(*args):
+                alpha_label.config(text=f"{alpha_var.get()}")
+            alpha_var.trace_add("write", update_alpha_label)
+            
+            # Contorno (outline)
+            outline_frame = tk.Frame(props_frame, bg="#222")
+            outline_frame.pack(fill=tk.X, pady=5)
+            tk.Label(outline_frame, text="Contorno:", fg="white", bg="#222").pack(anchor=tk.W)
+            
+            # Frame para entrada y vista previa del contorno
+            outline_input_frame = tk.Frame(outline_frame, bg="#222")
+            outline_input_frame.pack(fill=tk.X, pady=2)
+            
+            # Entrada de texto para el contorno
+            outline_var = tk.StringVar(value=elem.attrib.get("outline", "0,0,0,100"))
+            outline_entry = tk.Entry(outline_input_frame, textvariable=outline_var, width=15)
+            outline_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            outline_var.trace_add("write", lambda *args: self.update_attribute("outline", outline_var.get()))
+            
+            # Obtener color del contorno (excluyendo el valor alpha)
+            outline_parts = outline_var.get().split(',')
+            outline_color = ','.join(outline_parts[:3]) if len(outline_parts) >= 3 else "0,0,0"
+            
+            # Crear muestra de color para el contorno
+            outline_preview = tk.Frame(outline_input_frame, width=30, height=20, bg=self.rgb_to_hex(outline_color))
+            outline_preview.pack(side=tk.LEFT, padx=5)
+            
+            # Botón para selector de color del contorno
+            outline_button = tk.Button(outline_input_frame, text="Elegir contorno", 
+                                     command=lambda: self.open_outline_picker(outline_var, outline_preview),
+                                     bg="#336699", fg="white")
+            outline_button.pack(side=tk.LEFT, padx=5)
+            
+            # Control de transparencia (alpha) para el contorno
+            outline_alpha_frame = tk.Frame(outline_frame, bg="#222")
+            outline_alpha_frame.pack(fill=tk.X, pady=2)
+            tk.Label(outline_alpha_frame, text="Transparencia:", fg="white", bg="#222").pack(side=tk.LEFT)
+            
+            # Determinar si ya hay un valor alpha en el outline
+            outline_parts = outline_var.get().split(',')
+            outline_has_alpha = len(outline_parts) >= 4
+            outline_alpha_value = int(outline_parts[3]) if outline_has_alpha else 100
+            
+            # Crear control deslizante para transparencia del contorno
+            outline_alpha_var = tk.IntVar(value=outline_alpha_value)
+            outline_alpha_scale = tk.Scale(outline_alpha_frame, from_=0, to=255, orient=tk.HORIZONTAL, 
+                                         variable=outline_alpha_var, bg="#333", fg="white",
+                                         highlightbackground="#222", troughcolor="#444",
+                                         command=lambda val: self.update_outline_alpha(outline_var, outline_preview, int(val)))
+            outline_alpha_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+            
+            # Etiqueta para mostrar el valor actual
+            outline_alpha_label = tk.Label(outline_alpha_frame, text=f"{outline_alpha_value}", width=3, fg="white", bg="#222")
+            outline_alpha_label.pack(side=tk.LEFT)
+            
+            # Actualizar la etiqueta cuando cambie el valor
+            def update_outline_alpha_label(*args):
+                outline_alpha_label.config(text=f"{outline_alpha_var.get()}")
+            outline_alpha_var.trace_add("write", update_outline_alpha_label)
+            
+            # Ancho del contorno (outline_width)
+            outline_width_frame = tk.Frame(props_frame, bg="#222")
+            outline_width_frame.pack(fill=tk.X, pady=5)
+            tk.Label(outline_width_frame, text="Ancho de contorno:", fg="white", bg="#222").pack(side=tk.LEFT)
+            outline_width_var = tk.IntVar(value=int(elem.attrib.get("outline_width", 1)))
+            outline_width_spin = tk.Spinbox(
+                outline_width_frame, from_=1, to=20, textvariable=outline_width_var, width=6,
+                command=lambda: self.update_attribute("outline_width", outline_width_var.get())
+            )
+            outline_width_spin.pack(side=tk.LEFT, padx=5)
+            
+            # Dirección del texto (direction)
+            direction_frame = tk.Frame(props_frame, bg="#222")
+            direction_frame.pack(fill=tk.X, pady=5)
+            tk.Label(direction_frame, text="Dirección:", fg="white", bg="#222").pack(side=tk.LEFT)
+            
+            direction_var = tk.StringVar(value=elem.attrib.get("direction", "ltr"))
+            
+            direction_options = ["ltr", "rtl", "ttb"]  # izquierda a derecha, derecha a izquierda, arriba a abajo
+            direction_dropdown = tk.OptionMenu(direction_frame, direction_var, *direction_options, 
+                                            command=lambda val: self.update_attribute("direction", val))
+            direction_dropdown.config(bg="#444", fg="white", width=10)
+            direction_dropdown["menu"].config(bg="#444", fg="white")
+            direction_dropdown.pack(side=tk.LEFT, padx=5)
+            
+            warning_label = tk.Label(direction_frame, 
+                                text="(Requiere libraqm)", 
+                                fg="#aaa", bg="#222", font=("Arial", 8))
+            warning_label.pack(side=tk.LEFT, padx=5)
+            
             # Alineación
             align_frame = tk.Frame(props_frame, bg="#222")
             align_frame.pack(fill=tk.X, pady=5)
@@ -518,12 +681,188 @@ class LayoutEditor:
             align_var = tk.StringVar(value=elem.attrib.get("align", "left"))
             
             # Opciones de alineación
-            align_options = ["left", "center", "right"]
+            align_options = ["left", "center", "right", "lt", "mt", "rt", "lm", "mm", "rm", "lb", "mb", "rb"]
             align_dropdown = tk.OptionMenu(align_frame, align_var, *align_options, 
                                          command=lambda val: self.update_attribute("align", val))
             align_dropdown.config(bg="#444", fg="white", width=10)
             align_dropdown["menu"].config(bg="#444", fg="white")
             align_dropdown.pack(side=tk.LEFT, padx=5)
+            
+            # Botón de ayuda para alineación
+            align_help_btn = tk.Button(align_frame, text="?", 
+                                   command=self.show_align_help,
+                                   bg="#555", fg="white", width=2)
+            align_help_btn.pack(side=tk.LEFT, padx=2)
+            
+        elif ctype == "datetime":
+            # Formato de fecha/hora
+            format_frame = tk.Frame(props_frame, bg="#222")
+            format_frame.pack(fill=tk.X, pady=5)
+            tk.Label(format_frame, text="Formato:", fg="white", bg="#222").pack(anchor=tk.W)
+            format_var = tk.StringVar(value=elem.attrib.get("format", "%Y-%m-%d %H:%M:%S"))
+            format_entry = tk.Entry(format_frame, textvariable=format_var)
+            format_entry.pack(fill=tk.X, pady=2)
+            format_var.trace_add("write", lambda *args: self.update_attribute("format", format_var.get()))
+            
+            # Mostrar ejemplos de formatos comunes
+            examples_frame = tk.Frame(props_frame, bg="#222")
+            examples_frame.pack(fill=tk.X, pady=5)
+            tk.Label(examples_frame, text="Ejemplos:", fg="white", bg="#222").pack(anchor=tk.W)
+            
+            examples_list = tk.Frame(examples_frame, bg="#222")
+            examples_list.pack(fill=tk.X, pady=2)
+            
+            # Botones para formatos predefinidos
+            date_formats = [
+                ("%Y-%m-%d", "2023-08-13", "Fecha ISO"),
+                ("%d/%m/%Y", "13/08/2023", "Fecha Europa"),
+                ("%m/%d/%Y", "08/13/2023", "Fecha EEUU"),
+                ("%H:%M:%S", "14:30:45", "Hora 24h"),
+                ("%I:%M:%S %p", "02:30:45 PM", "Hora 12h"),
+                ("%H:%M:%S.%f", "14:30:45.123456", "Hora con ms"),
+                ("%Y-%m-%d %H:%M:%S", "2023-08-13 14:30:45", "Fecha y hora completa"),
+                ("%a, %d %b %Y", "Dom, 13 Ago 2023", "Fecha con día de semana")
+            ]
+            
+            for i, (fmt, example, desc) in enumerate(date_formats):
+                btn_frame = tk.Frame(examples_list, bg="#222")
+                btn_frame.pack(fill=tk.X, pady=2)
+                
+                btn = tk.Button(btn_frame, text=example, 
+                               command=lambda f=fmt: format_var.set(f),
+                               bg="#336699", fg="white")
+                btn.pack(side=tk.LEFT, fill=tk.X, expand=True)
+                
+                # Label para mostrar el formato y descripción
+                lbl = tk.Label(btn_frame, text=f"{fmt} - {desc}", fg="#aaa", bg="#222")
+                lbl.pack(side=tk.LEFT, padx=5)
+            
+            # Truncar decimales de segundos
+            truncate_frame = tk.Frame(props_frame, bg="#222")
+            truncate_frame.pack(fill=tk.X, pady=5)
+            tk.Label(truncate_frame, text="Truncar decimales:", fg="white", bg="#222").pack(side=tk.LEFT)
+            
+            truncate_values = ["", "1", "2", "3", "4", "5"]
+            truncate_var = tk.StringVar(value=elem.attrib.get("truncate", ""))
+            
+            truncate_dropdown = tk.OptionMenu(truncate_frame, truncate_var, *truncate_values, 
+                                            command=lambda val: self.update_attribute("truncate", val))
+            truncate_dropdown.config(bg="#444", fg="white", width=5)
+            truncate_dropdown["menu"].config(bg="#444", fg="white")
+            truncate_dropdown.pack(side=tk.LEFT, padx=5)
+            
+            # Explicación del truncado
+            tk.Label(truncate_frame, text="(1=décimas, 2=centésimas...)", 
+                    fg="#aaa", bg="#222", font=("Arial", 8)).pack(side=tk.LEFT, padx=5)
+            
+            # Cache
+            cache_frame = tk.Frame(props_frame, bg="#222")
+            cache_frame.pack(fill=tk.X, pady=5)
+            tk.Label(cache_frame, text="Caché:", fg="white", bg="#222").pack(side=tk.LEFT)
+            
+            cache_var = tk.StringVar(value=elem.attrib.get("cache", "true"))
+            cache_dropdown = tk.OptionMenu(cache_frame, cache_var, "true", "false", 
+                                         command=lambda val: self.update_attribute("cache", val))
+            cache_dropdown.config(bg="#444", fg="white", width=5)
+            cache_dropdown["menu"].config(bg="#444", fg="white")
+            cache_dropdown.pack(side=tk.LEFT, padx=5)
+            
+            # Explicación del caché
+            tk.Label(cache_frame, 
+                    text="(false para segundos/milisegundos)", 
+                    fg="#aaa", bg="#222", font=("Arial", 8)).pack(side=tk.LEFT, padx=5)
+            
+            # Botón para previsualizar el datetime con la fecha/hora actual
+            preview_btn = tk.Button(
+                props_frame, text="Previsualizar con fecha/hora actual", 
+                command=self.rerender_layout, bg="#336699", fg="white"
+            )
+            preview_btn.pack(fill=tk.X, pady=10)
+            
+            # Tamaño de fuente
+            size_frame = tk.Frame(props_frame, bg="#222")
+            size_frame.pack(fill=tk.X, pady=5)
+            tk.Label(size_frame, text="Tamaño:", fg="white", bg="#222").pack(side=tk.LEFT)
+            size_var = tk.IntVar(value=int(elem.attrib.get("size", 14)))
+            size_spin = tk.Spinbox(
+                size_frame, from_=5, to=200, textvariable=size_var, width=6,
+                command=lambda: self.update_attribute("size", size_var.get())
+            )
+            size_spin.pack(side=tk.LEFT, padx=5)
+            
+            # Color RGB
+            color_frame = tk.Frame(props_frame, bg="#222")
+            color_frame.pack(fill=tk.X, pady=5)
+            tk.Label(color_frame, text="Color RGB:", fg="white", bg="#222").pack(anchor=tk.W)
+            
+            # Frame para entrada y vista previa del color
+            rgb_input_frame = tk.Frame(color_frame, bg="#222")
+            rgb_input_frame.pack(fill=tk.X, pady=2)
+            
+            # Entrada de texto para el color
+            rgb_var = tk.StringVar(value=elem.attrib.get("rgb", "255,255,255"))
+            rgb_entry = tk.Entry(rgb_input_frame, textvariable=rgb_var, width=15)
+            rgb_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            rgb_var.trace_add("write", lambda *args: self.update_attribute("rgb", rgb_var.get()))
+            
+            # Crear muestra de color
+            color_preview = tk.Frame(rgb_input_frame, width=30, height=20, bg=self.rgb_to_hex(rgb_var.get()))
+            color_preview.pack(side=tk.LEFT, padx=5)
+            
+            # Botón para selector de color
+            color_button = tk.Button(rgb_input_frame, text="Elegir color", 
+                                     command=lambda: self.open_color_picker(rgb_var, color_preview),
+                                     bg="#336699", fg="white")
+            color_button.pack(side=tk.LEFT, padx=5)
+            
+            # Control de transparencia (alpha) para RGB
+            alpha_frame = tk.Frame(color_frame, bg="#222")
+            alpha_frame.pack(fill=tk.X, pady=2)
+            tk.Label(alpha_frame, text="Transparencia:", fg="white", bg="#222").pack(side=tk.LEFT)
+            
+            # Determinar si ya hay un valor alpha en el RGB
+            rgb_parts = rgb_var.get().split(',')
+            has_alpha = len(rgb_parts) >= 4
+            alpha_value = int(rgb_parts[3]) if has_alpha else 255
+            
+            # Crear control deslizante para transparencia
+            alpha_var = tk.IntVar(value=alpha_value)
+            alpha_scale = tk.Scale(alpha_frame, from_=0, to=255, orient=tk.HORIZONTAL, 
+                                variable=alpha_var, bg="#333", fg="white",
+                                highlightbackground="#222", troughcolor="#444",
+                                command=lambda val: self.update_rgb_alpha(rgb_var, color_preview, int(val)))
+            alpha_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+            
+            # Etiqueta para mostrar el valor actual
+            alpha_label = tk.Label(alpha_frame, text=f"{alpha_value}", width=3, fg="white", bg="#222")
+            alpha_label.pack(side=tk.LEFT)
+            
+            # Actualizar la etiqueta cuando cambie el valor
+            def update_alpha_label(*args):
+                alpha_label.config(text=f"{alpha_var.get()}")
+            alpha_var.trace_add("write", update_alpha_label)
+            
+            # Alineación
+            align_frame = tk.Frame(props_frame, bg="#222")
+            align_frame.pack(fill=tk.X, pady=5)
+            tk.Label(align_frame, text="Alineación:", fg="white", bg="#222").pack(side=tk.LEFT)
+            
+            # Crear variable para alineación
+            align_var = tk.StringVar(value=elem.attrib.get("align", "left"))
+            
+            # Opciones de alineación
+            align_options = ["left", "center", "right", "lt", "mt", "rt", "lm", "mm", "rm", "lb", "mb", "rb"]
+            align_dropdown = tk.OptionMenu(align_frame, align_var, *align_options, 
+                                         command=lambda val: self.update_attribute("align", val))
+            align_dropdown.config(bg="#444", fg="white", width=10)
+            align_dropdown["menu"].config(bg="#444", fg="white")
+            align_dropdown.pack(side=tk.LEFT, padx=5)
+            
+            # Botón de ayuda para alineación
+            align_help_btn = tk.Button(align_frame, text="?", 
+                                   command=self.show_align_help,
+                                   bg="#555", fg="white", width=2)
+            align_help_btn.pack(side=tk.LEFT, padx=2)
             
             # Color
             color_frame = tk.Frame(props_frame, bg="#222")
@@ -550,35 +889,152 @@ class LayoutEditor:
                                      bg="#336699", fg="white")
             color_button.pack(side=tk.LEFT, padx=5)
             
+            # Control de transparencia (alpha) para RGB
+            alpha_frame = tk.Frame(color_frame, bg="#222")
+            alpha_frame.pack(fill=tk.X, pady=2)
+            tk.Label(alpha_frame, text="Transparencia:", fg="white", bg="#222").pack(side=tk.LEFT)
+            
+            # Determinar si ya hay un valor alpha en el RGB
+            rgb_parts = rgb_var.get().split(',')
+            has_alpha = len(rgb_parts) >= 4
+            alpha_value = int(rgb_parts[3]) if has_alpha else 255
+            
+            # Crear control deslizante para transparencia
+            alpha_var = tk.IntVar(value=alpha_value)
+            alpha_scale = tk.Scale(alpha_frame, from_=0, to=255, orient=tk.HORIZONTAL, 
+                                 variable=alpha_var, bg="#333", fg="white",
+                                 highlightbackground="#222", troughcolor="#444",
+                                 command=lambda val: self.update_rgb_alpha(rgb_var, color_preview, int(val)))
+            alpha_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+            
+            # Etiqueta para mostrar el valor actual
+            alpha_label = tk.Label(alpha_frame, text=f"{alpha_value}", width=3, fg="white", bg="#222")
+            alpha_label.pack(side=tk.LEFT)
+            
+            # Actualizar la etiqueta cuando cambie el valor
+            def update_alpha_label(*args):
+                alpha_label.config(text=f"{alpha_var.get()}")
+            alpha_var.trace_add("write", update_alpha_label)
+            
             # Contorno (outline)
-            if "outline" in elem.attrib:
-                outline_frame = tk.Frame(props_frame, bg="#222")
-                outline_frame.pack(fill=tk.X, pady=5)
-                tk.Label(outline_frame, text="Contorno:", fg="white", bg="#222").pack(anchor=tk.W)
-                
-                # Frame para entrada y vista previa del contorno
-                outline_input_frame = tk.Frame(outline_frame, bg="#222")
-                outline_input_frame.pack(fill=tk.X, pady=2)
-                
-                # Entrada de texto para el contorno
-                outline_var = tk.StringVar(value=elem.attrib.get("outline", "0,0,0,100"))
-                outline_entry = tk.Entry(outline_input_frame, textvariable=outline_var, width=15)
-                outline_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-                outline_var.trace_add("write", lambda *args: self.update_attribute("outline", outline_var.get()))
-                
-                # Obtener color del contorno (excluyendo el valor alpha)
-                outline_parts = outline_var.get().split(',')
-                outline_color = ','.join(outline_parts[:3]) if len(outline_parts) >= 3 else "0,0,0"
-                
-                # Crear muestra de color para el contorno
-                outline_preview = tk.Frame(outline_input_frame, width=30, height=20, bg=self.rgb_to_hex(outline_color))
-                outline_preview.pack(side=tk.LEFT, padx=5)
-                
-                # Botón para selector de color del contorno
-                outline_button = tk.Button(outline_input_frame, text="Elegir contorno", 
-                                         command=lambda: self.open_outline_picker(outline_var, outline_preview),
-                                         bg="#336699", fg="white")
-                outline_button.pack(side=tk.LEFT, padx=5)
+            outline_frame = tk.Frame(props_frame, bg="#222")
+            outline_frame.pack(fill=tk.X, pady=5)
+            tk.Label(outline_frame, text="Contorno:", fg="white", bg="#222").pack(anchor=tk.W)
+            
+            # Frame para entrada y vista previa del contorno
+            outline_input_frame = tk.Frame(outline_frame, bg="#222")
+            outline_input_frame.pack(fill=tk.X, pady=2)
+            
+            # Entrada de texto para el contorno
+            outline_var = tk.StringVar(value=elem.attrib.get("outline", "0,0,0,100"))
+            outline_entry = tk.Entry(outline_input_frame, textvariable=outline_var, width=15)
+            outline_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            outline_var.trace_add("write", lambda *args: self.update_attribute("outline", outline_var.get()))
+            
+            # Obtener color del contorno (excluyendo el valor alpha)
+            outline_parts = outline_var.get().split(',')
+            outline_color = ','.join(outline_parts[:3]) if len(outline_parts) >= 3 else "0,0,0"
+            
+            # Crear muestra de color para el contorno
+            outline_preview = tk.Frame(outline_input_frame, width=30, height=20, bg=self.rgb_to_hex(outline_color))
+            outline_preview.pack(side=tk.LEFT, padx=5)
+            
+            # Botón para selector de color del contorno
+            outline_button = tk.Button(outline_input_frame, text="Elegir contorno", 
+                                     command=lambda: self.open_outline_picker(outline_var, outline_preview),
+                                     bg="#336699", fg="white")
+            outline_button.pack(side=tk.LEFT, padx=5)
+            
+            # Control de transparencia (alpha) para el contorno
+            outline_alpha_frame = tk.Frame(outline_frame, bg="#222")
+            outline_alpha_frame.pack(fill=tk.X, pady=2)
+            tk.Label(outline_alpha_frame, text="Transparencia:", fg="white", bg="#222").pack(side=tk.LEFT)
+            
+            # Determinar si ya hay un valor alpha en el outline
+            outline_parts = outline_var.get().split(',')
+            outline_has_alpha = len(outline_parts) >= 4
+            outline_alpha_value = int(outline_parts[3]) if outline_has_alpha else 100
+            
+            # Crear control deslizante para transparencia del contorno
+            outline_alpha_var = tk.IntVar(value=outline_alpha_value)
+            outline_alpha_scale = tk.Scale(outline_alpha_frame, from_=0, to=255, orient=tk.HORIZONTAL, 
+                                         variable=outline_alpha_var, bg="#333", fg="white",
+                                         highlightbackground="#222", troughcolor="#444",
+                                         command=lambda val: self.update_outline_alpha(outline_var, outline_preview, int(val)))
+            outline_alpha_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+            
+            # Etiqueta para mostrar el valor actual
+            outline_alpha_label = tk.Label(outline_alpha_frame, text=f"{outline_alpha_value}", width=3, fg="white", bg="#222")
+            outline_alpha_label.pack(side=tk.LEFT)
+            
+            # Actualizar la etiqueta cuando cambie el valor
+            def update_outline_alpha_label(*args):
+                outline_alpha_label.config(text=f"{outline_alpha_var.get()}")
+            outline_alpha_var.trace_add("write", update_outline_alpha_label)
+            
+            # Ancho del contorno (outline_width)
+            outline_width_frame = tk.Frame(props_frame, bg="#222")
+            outline_width_frame.pack(fill=tk.X, pady=5)
+            tk.Label(outline_width_frame, text="Ancho de contorno:", fg="white", bg="#222").pack(side=tk.LEFT)
+            outline_width_var = tk.IntVar(value=int(elem.attrib.get("outline_width", 1)))
+            outline_width_spin = tk.Spinbox(
+                outline_width_frame, from_=1, to=20, textvariable=outline_width_var, width=6,
+                command=lambda: self.update_attribute("outline_width", outline_width_var.get())
+            )
+            outline_width_spin.pack(side=tk.LEFT, padx=5)
+            
+            # Dirección del texto (direction)
+            direction_frame = tk.Frame(props_frame, bg="#222")
+            direction_frame.pack(fill=tk.X, pady=5)
+            tk.Label(direction_frame, text="Dirección:", fg="white", bg="#222").pack(side=tk.LEFT)
+            
+            # Crear variable para dirección
+            direction_var = tk.StringVar(value=elem.attrib.get("direction", "ltr"))
+            
+            # Opciones de dirección
+            direction_options = ["ltr", "rtl", "ttb"]  # izquierda a derecha, derecha a izquierda, arriba a abajo
+            direction_dropdown = tk.OptionMenu(direction_frame, direction_var, *direction_options, 
+                                            command=lambda val: self.update_attribute("direction", val))
+            direction_dropdown.config(bg="#444", fg="white", width=10)
+            direction_dropdown["menu"].config(bg="#444", fg="white")
+            direction_dropdown.pack(side=tk.LEFT, padx=5)
+            
+            # Advertencia sobre libraqm
+            warning_label = tk.Label(direction_frame, 
+                                   text="⚠️ Requiere libraqm", 
+                                   fg="#ffcc00", bg="#222", font=("Arial", 8))
+            warning_label.pack(side=tk.LEFT, padx=5)
+            
+            # Avanzado: Anclaje de texto completo (align completo)
+            advanced_align_frame = tk.Frame(props_frame, bg="#222")
+            advanced_align_frame.pack(fill=tk.X, pady=5)
+            tk.Label(advanced_align_frame, text="Alineación avanzada:", fg="white", bg="#222").pack(side=tk.LEFT)
+            
+            # Crear variable para alineación avanzada
+            adv_align_var = tk.StringVar(value=elem.attrib.get("align", "left"))
+            
+            # Opciones de alineación avanzada según la documentación de Pillow
+            adv_align_options = ["left", "center", "right", "lt", "mt", "rt", "lm", "mm", "rm", "lb", "mb", "rb"]
+            adv_align_dropdown = tk.OptionMenu(advanced_align_frame, adv_align_var, *adv_align_options, 
+                                            command=lambda val: self.update_attribute("align", val))
+            adv_align_dropdown.config(bg="#444", fg="white", width=10)
+            adv_align_dropdown["menu"].config(bg="#444", fg="white")
+            adv_align_dropdown.pack(side=tk.LEFT, padx=5)
+            
+            # Mostrar mensaje informativo
+            tk.Label(advanced_align_frame, text="(l=left, r=right, m=middle, t=top, b=bottom)", 
+                    fg="#aaa", bg="#222", font=("Arial", 8)).pack(side=tk.LEFT, padx=5)
+            
+            # Nota importante sobre libraqm
+            if not LIBRAQM_AVAILABLE:
+                note_frame = tk.Frame(props_frame, bg="#332200")
+                note_frame.pack(fill=tk.X, pady=5)
+                tk.Label(note_frame, 
+                       text="⚠️ NOTA: Tu instalación de Pillow no tiene libraqm.\n"
+                            "Los atributos de dirección de texto pueden no funcionar.\n"
+                            "Los cambios se guardarán pero no se mostrarán en la vista previa.",
+                       fg="#ffcc00", bg="#332200", justify=tk.LEFT,
+                       wraplength=280, padx=5, pady=5).pack(fill=tk.X)
             
         elif ctype == "icon":
             # Tamaño de icono
@@ -689,6 +1145,22 @@ class LayoutEditor:
                     break
         
         print("[INFO] Layout re-renderizado con éxito")
+    
+    def remove_libraqm_attributes(self, node):
+        """Elimina temporalmente atributos que requieren libraqm de un árbol XML"""
+        # Lista de atributos que requieren libraqm
+        libraqm_attrs = ["direction"]
+        
+        # Procesar los componentes de texto
+        for elem in node.findall(".//component[@type='text']"):
+            for attr in libraqm_attrs:
+                if attr in elem.attrib:
+                    print(f"[INFO] Eliminando atributo '{attr}' temporalmente para el renderizado")
+                    del elem.attrib[attr]
+        
+        # Procesar recursivamente todos los elementos
+        for child in node:
+            self.remove_libraqm_attributes(child)
     
     def show_all_attributes(self):
         """Muestra una ventana con todos los atributos para edición"""
@@ -1071,8 +1543,8 @@ class LayoutEditor:
             print(f"[ERROR] Error al convertir RGB a Hex: {e}")
             return '#ffffff'  # Blanco por defecto
     
-    def hex_to_rgb(self, hex_color):
-        """Convierte un color hexadecimal a formato RGB"""
+    def hex_to_rgb(self, hex_color, include_alpha=False, alpha_value="255"):
+        """Convierte un color hexadecimal a formato RGB, opcionalmente incluyendo alpha"""
         # Eliminar el símbolo # si existe
         hex_color = hex_color.lstrip('#')
         
@@ -1081,12 +1553,24 @@ class LayoutEditor:
         g = int(hex_color[2:4], 16)
         b = int(hex_color[4:6], 16)
         
-        return f"{r},{g},{b}"
+        # Opcionalmente incluir alpha
+        if include_alpha:
+            return f"{r},{g},{b},{alpha_value}"
+        else:
+            return f"{r},{g},{b}"
     
     def open_color_picker(self, rgb_var, preview_widget):
         """Abre el selector de color y actualiza el valor RGB"""
-        # Convertir RGB actual a hex para el selector
+        # Obtener el valor RGB actual
         current_rgb = rgb_var.get()
+        current_parts = current_rgb.split(',')
+        
+        # Extraer el valor alpha si existe
+        alpha_value = "255"  # Valor por defecto
+        if len(current_parts) >= 4:
+            alpha_value = current_parts[3]
+        
+        # Convertir RGB a hex para el selector
         current_hex = self.rgb_to_hex(current_rgb)
         
         # Abrir el selector de color
@@ -1094,8 +1578,11 @@ class LayoutEditor:
         
         # Si se seleccionó un color (no se canceló)
         if color and color[1]:
+            # Decidir si incluir el valor alpha en el nuevo RGB
+            include_alpha = len(current_parts) >= 4
+            
             # Actualizar el valor RGB en la entrada
-            new_rgb = self.hex_to_rgb(color[1])
+            new_rgb = self.hex_to_rgb(color[1], include_alpha, alpha_value)
             rgb_var.set(new_rgb)
             
             # Actualizar la vista previa del color
@@ -1103,6 +1590,11 @@ class LayoutEditor:
             
             # Actualizar el atributo en el elemento
             self.update_attribute("rgb", new_rgb)
+            
+            # Mostrar información sobre el nuevo color
+            rgb_parts = new_rgb.split(',')
+            alpha_info = f", Alpha: {alpha_value}" if include_alpha else ""
+            print(f"[INFO] Color actualizado a RGB: {','.join(rgb_parts[:3])}{alpha_info}")
     
     def open_outline_picker(self, outline_var, preview_widget):
         """Abre el selector de color para el contorno (outline)"""
@@ -1110,12 +1602,16 @@ class LayoutEditor:
         outline_parts = outline_var.get().split(',')
         
         # Asegurarse de que hay suficientes partes
-        if len(outline_parts) < 4:
-            outline_parts = ['0', '0', '0', '100']  # Valor por defecto
+        if len(outline_parts) < 3:
+            outline_parts = ['0', '0', '0']  # Valor por defecto
+        
+        # Extraer el valor alpha si existe
+        alpha_value = "100"  # Valor por defecto para contornos
+        if len(outline_parts) >= 4:
+            alpha_value = outline_parts[3]
         
         # Extraer los valores RGB (sin alpha)
         r, g, b = outline_parts[:3]
-        alpha = outline_parts[3] if len(outline_parts) > 3 else '100'
         
         # Convertir a hex para el selector
         current_hex = self.rgb_to_hex(f"{r},{g},{b}")
@@ -1125,11 +1621,11 @@ class LayoutEditor:
         
         # Si se seleccionó un color (no se canceló)
         if color and color[1]:
-            # Convertir el nuevo color a RGB
-            rgb = self.hex_to_rgb(color[1])
+            # Decidir si incluir el valor alpha en el nuevo outline
+            include_alpha = len(outline_parts) >= 4
             
-            # Mantener el valor alpha original
-            new_outline = f"{rgb},{alpha}"
+            # Convertir el nuevo color a RGB, manteniendo el valor alpha si existía
+            new_outline = self.hex_to_rgb(color[1], include_alpha, alpha_value)
             
             # Actualizar el valor en la entrada
             outline_var.set(new_outline)
@@ -1139,6 +1635,63 @@ class LayoutEditor:
             
             # Actualizar el atributo en el elemento
             self.update_attribute("outline", new_outline)
+            
+            # Mostrar información sobre el nuevo color de contorno
+            outline_parts = new_outline.split(',')
+            alpha_info = f", Alpha: {alpha_value}" if include_alpha else ""
+            print(f"[INFO] Color de contorno actualizado a RGB: {','.join(outline_parts[:3])}{alpha_info}")
+    
+    def update_rgb_alpha(self, rgb_var, preview_widget, alpha_value):
+        """Actualiza el valor alpha (transparencia) del color RGB"""
+        # Obtener el valor RGB actual
+        current_rgb = rgb_var.get()
+        rgb_parts = current_rgb.split(',')
+        
+        # Extraer los valores RGB (sin alpha)
+        if len(rgb_parts) < 3:
+            return  # No hay suficientes valores para actualizar
+        
+        r, g, b = rgb_parts[:3]
+        
+        # Crear nuevo valor RGB con alpha
+        new_rgb = f"{r},{g},{b},{alpha_value}"
+        
+        # Actualizar el valor en la entrada
+        rgb_var.set(new_rgb)
+        
+        # No es necesario actualizar la vista previa ya que el alpha no afecta la apariencia
+        # en la interfaz de usuario, solo en el render final
+        
+        # Actualizar el atributo en el elemento
+        self.update_attribute("rgb", new_rgb)
+        
+        print(f"[INFO] Transparencia de color actualizada a: {alpha_value}/255")
+    
+    def update_outline_alpha(self, outline_var, preview_widget, alpha_value):
+        """Actualiza el valor alpha (transparencia) del contorno"""
+        # Obtener el valor de contorno actual
+        current_outline = outline_var.get()
+        outline_parts = current_outline.split(',')
+        
+        # Extraer los valores RGB (sin alpha)
+        if len(outline_parts) < 3:
+            return  # No hay suficientes valores para actualizar
+        
+        r, g, b = outline_parts[:3]
+        
+        # Crear nuevo valor de contorno con alpha
+        new_outline = f"{r},{g},{b},{alpha_value}"
+        
+        # Actualizar el valor en la entrada
+        outline_var.set(new_outline)
+        
+        # No es necesario actualizar la vista previa ya que el alpha no afecta la apariencia
+        # en la interfaz de usuario, solo en el render final
+        
+        # Actualizar el atributo en el elemento
+        self.update_attribute("outline", new_outline)
+        
+        print(f"[INFO] Transparencia de contorno actualizada a: {alpha_value}/255")
     
     def save_xml(self):
         """Guarda los cambios en el archivo XML"""
@@ -1148,6 +1701,65 @@ class LayoutEditor:
         
         # Mensaje de confirmación
         tk.messagebox.showinfo("Guardado", f"El archivo XML ha sido guardado correctamente:\n{self.xml_path}")
+    
+    def show_align_help(self):
+        """Muestra una ventana con ayuda sobre alineación de texto"""
+        help_window = tk.Toplevel(self.master)
+        help_window.title("Ayuda sobre alineación de texto")
+        help_window.geometry("500x600")
+        help_window.transient(self.master)
+        help_window.grab_set()
+        
+        frame = tk.Frame(help_window, bg="#222", padx=15, pady=15)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        title = tk.Label(frame, text="Opciones de alineación de texto", fg="white", bg="#222", 
+                       font=("Arial", 14, "bold"))
+        title.pack(pady=(0, 10))
+        
+        scroll = tk.Scrollbar(frame)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        text = tk.Text(frame, bg="#333", fg="white", wrap=tk.WORD, yscrollcommand=scroll.set, 
+                     font=("Consolas", 10), padx=10, pady=10)
+        text.pack(fill=tk.BOTH, expand=True)
+        scroll.config(command=text.yview)
+        
+        help_text = """Opciones de alineación de texto (atributo 'align'):
+
+            Las opciones básicas son:
+            - 'left': Alinea el texto a la izquierda
+            - 'center': Centra el texto horizontalmente
+            - 'right': Alinea el texto a la derecha
+
+            Opciones avanzadas (anclas de texto):
+            El sistema de anclas de texto permite un control más preciso usando dos letras:
+            - Primera letra: posición horizontal (l=izquierda, m=medio, r=derecha)
+            - Segunda letra: posición vertical (t=arriba, m=medio, b=abajo)
+
+            Por ejemplo:
+            - 'lt': Arriba a la izquierda (Left-Top)
+            - 'mt': Arriba en el centro (Middle-Top)
+            - 'rt': Arriba a la derecha (Right-Top)
+            - 'lm': Centro izquierda (Left-Middle)
+            - 'mm': Centro absoluto (Middle-Middle)
+            - 'rm': Centro derecha (Right-Middle)
+            - 'lb': Abajo a la izquierda (Left-Bottom)
+            - 'mb': Abajo en el centro (Middle-Bottom)
+            - 'rb': Abajo a la derecha (Right-Bottom)
+
+            Estas opciones controlan el punto de anclaje del texto en relación a las coordenadas x,y especificadas.
+
+            Para más información, consulta la documentación de Pillow sobre text anchors:
+            https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html
+            """
+        
+        text.insert(tk.END, help_text)
+        text.config(state=tk.DISABLED)
+        
+        close_btn = tk.Button(frame, text="Cerrar", command=help_window.destroy, 
+                            bg="#336699", fg="white")
+        close_btn.pack(pady=10)
 
 if __name__ == "__main__":
     xml_path = seleccionar_xml()
