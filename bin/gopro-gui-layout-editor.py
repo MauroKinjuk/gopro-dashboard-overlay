@@ -78,6 +78,14 @@ class LayoutEditor:
         self.save_btn = tk.Button(self.side_panel, text="Guardar XML", command=self.save_xml, 
                                   bg="#2a52be", fg="white", padx=10, pady=5)
         self.save_btn.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
+
+        # Botón persistente para renderizar cambios (visible siempre encima del botón Guardar)
+        self.rerender_btn = tk.Button(
+            self.side_panel, text="Renderizar cambios",
+            command=self.rerender_layout, bg="#336699", fg="white"
+        )
+        # Empaquetar encima del botón guardar
+        self.rerender_btn.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 10))
         
         # Información del elemento seleccionado
         self.selection_label = tk.Label(self.side_panel, text="Ningún elemento seleccionado", 
@@ -86,6 +94,7 @@ class LayoutEditor:
         
         # Variables de estado
         self.items = []  # Lista de componentes para selección
+        self._rect_to_index = {}
         self.selected = None  # Componente seleccionado actualmente
         self.selected_translate = None  # Translate padre seleccionado
         self.rendered_image = None  # Imagen renderizada
@@ -188,8 +197,51 @@ class LayoutEditor:
     
     def parse_components(self):
         """Analiza el XML para identificar todos los componentes seleccionables"""
+        # Eliminar rectángulos previos del canvas para evitar superposición
+        try:
+            for rid in list(self._rect_to_index.keys()):
+                try:
+                    self.canvas.delete(rid)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        self._rect_to_index.clear()
         self.items.clear()
         
+        def get_align_offsets(elem, width, height):
+            """Calcula el desplazamiento horizontal/vertical según el atributo 'align'.
+            Devuelve (x_offset, y_offset) en píxeles que deben sumarse a la posición ancla.
+            """
+            align = elem.attrib.get("align", "left")
+            # Normalizar
+            a = align.lower()
+            # Horizontal
+            x_off = 0
+            if a == "center" or a == "centre":
+                x_off = -width // 2
+            elif a == "right" or (len(a) >= 1 and a[0] == 'r'):
+                # 'right' o anclas como 'rt','rm','rb'
+                x_off = -width
+            else:
+                # izquierda por defecto o anclas que empiezan por 'l'
+                x_off = 0
+
+            # Vertical (soporte básico para anclas de dos letras: t,m,b)
+            y_off = 0
+            if len(a) == 2:
+                v = a[1]
+                if v == 'm':
+                    y_off = -height // 2
+                elif v == 'b':
+                    y_off = -height
+                else:
+                    y_off = 0
+
+            return x_off, y_off
+
+
         def walk(node, offset_x=0, offset_y=0, parent_translate=None):
             this_x = offset_x
             this_y = offset_y
@@ -241,20 +293,50 @@ class LayoutEditor:
                         "type": ctype
                     }
                     
-                    # Dibujar un rectángulo de selección
-                    zx = x * self.zoom
-                    zy = y * self.zoom
+                    # Calcular desplazamientos por alineación (hitbox)
+                    x_off, y_off = get_align_offsets(child, width, height)
+                    hit_x = x + x_off
+                    hit_y = y + y_off
+
+                    # Dibujar un rectángulo de selección usando la hitbox
+                    zx = hit_x * self.zoom
+                    zy = hit_y * self.zoom
                     zw = width * self.zoom
                     zh = height * self.zoom
                     
                     # Crear rectángulo interactivo (invisible)
+                    idx = len(self.items)
                     rect_id = self.canvas.create_rectangle(
                         zx, zy, zx+zw, zy+zh,
-                        outline="", fill="", tags=f"comp_{len(self.items)}"
+                        outline="", fill="", tags=f"comp_{idx}"
                     )
-                    
+
                     item["rect_id"] = rect_id
+                    # Guardar hitbox para uso posterior (selección/drag)
+                    item["hit_x"] = hit_x
+                    item["hit_y"] = hit_y
                     self.items.append(item)
+                    # Mapear rect_id a índice para selección rápida
+                    self._rect_to_index[rect_id] = idx
+
+                    # Debug: imprimir info de rectángulo para métricas
+                    if ctype == "metric":
+                        try:
+                            print(f"[DEBUG] Metric rect #{idx} id={rect_id} box=({zx},{zy},{zx+zw},{zy+zh}) anchor=({x},{y}) hit=({hit_x},{hit_y}) zoom={self.zoom}")
+                        except Exception:
+                            pass
+
+                    # Asegurar que el rectángulo esté por encima de la imagen para recibir clicks
+                    try:
+                        self.canvas.tag_raise(rect_id)
+                    except Exception:
+                        pass
+
+                    # Nota: se suprimió el highlight al pasar el ratón que dibujaba un recuadro amarillo
+
+                    # Asegurar que hacer click en el rectángulo selecciona el componente
+                    # usamos i como valor por defecto para evitar cierre sobre la variable
+                    self.canvas.tag_bind(rect_id, '<Button-1>', lambda e, i=idx: self._on_rect_click(i, e))
                     
                     # Verificar si tiene atributos x,y cuando no debería
                     # Solo los iconos pueden tener x,y directamente
@@ -317,6 +399,35 @@ class LayoutEditor:
                 self.fix_btn = None
         
         return len(problemas) == 0
+
+    def _get_align_offsets_for_elem(self, elem, width, height):
+        """Wrapper de utilidad para calcular offsets de alineación desde otros métodos.
+        Devuelve (x_off, y_off).
+        """
+        try:
+            align = elem.attrib.get("align", "left")
+            a = align.lower()
+            x_off = 0
+            if a == "center" or a == "centre":
+                x_off = -width // 2
+            elif a == "right" or (len(a) >= 1 and a[0] == 'r'):
+                x_off = -width
+            else:
+                x_off = 0
+
+            y_off = 0
+            if len(a) == 2:
+                v = a[1]
+                if v == 'm':
+                    y_off = -height // 2
+                elif v == 'b':
+                    y_off = -height
+                else:
+                    y_off = 0
+
+            return x_off, y_off
+        except Exception:
+            return 0, 0
         
     def fix_layout_structure(self):
         """Corrige automáticamente problemas comunes en la estructura del layout"""
@@ -407,8 +518,11 @@ class LayoutEditor:
         # Dibujar un rectángulo para el componente seleccionado
         if self.selected:
             elem = self.selected["element"]
-            x = self.selected.get("_temp_x", self.selected["abs_x"])
-            y = self.selected.get("_temp_y", self.selected["abs_y"])
+            # x,y son coordenadas ancla (las que están en el XML o las temporales durante drag)
+            anchor_x = self.selected.get("_temp_x", self.selected["abs_x"])
+            anchor_y = self.selected.get("_temp_y", self.selected["abs_y"])
+            x = anchor_x
+            y = anchor_y
             
             # Calcular dimensiones
             if self.selected["kind"] == "icon":
@@ -429,9 +543,19 @@ class LayoutEditor:
                     # Estimamos aproximadamente 0.7 veces el tamaño de fuente por carácter
                     w = max(len(texto) * int(font_size * 0.7), 60)
             
-            # Dibujar rectángulo de selección con zoom aplicado
-            zx = x * self.zoom
-            zy = y * self.zoom
+            # Calcular offsets por alineación y dibujar rectángulo de selección con zoom aplicado
+            x_off, y_off = (0, 0)
+            try:
+                x_off, y_off = self._get_align_offsets_for_elem(elem, w, h)
+            except Exception:
+                # Fallback al comportamiento antiguo
+                x_off, y_off = (0, 0)
+
+            hit_x = x + x_off
+            hit_y = y + y_off
+
+            zx = hit_x * self.zoom
+            zy = hit_y * self.zoom
             zw = w * self.zoom
             zh = h * self.zoom
             
@@ -452,8 +576,12 @@ class LayoutEditor:
     def update_properties_panel(self):
         """Actualiza el panel de propiedades según el elemento seleccionado"""
         # Limpiar panel excepto elementos fijos
+        fixed_widgets = [self.selection_label, self.save_btn]
+        if hasattr(self, 'rerender_btn') and self.rerender_btn is not None:
+            fixed_widgets.append(self.rerender_btn)
+
         for widget in self.side_panel.pack_slaves():
-            if widget not in [self.selection_label, self.save_btn]:
+            if widget not in fixed_widgets:
                 widget.destroy()
         
         if not self.selected:
@@ -702,7 +830,8 @@ class LayoutEditor:
             format_var = tk.StringVar(value=elem.attrib.get("format", "%Y-%m-%d %H:%M:%S"))
             format_entry = tk.Entry(format_frame, textvariable=format_var)
             format_entry.pack(fill=tk.X, pady=2)
-            format_var.trace_add("write", lambda *args: self.update_attribute("format", format_var.get()))
+            # Al cambiar el formato, actualizar el atributo y re-renderizar inmediatamente
+            format_var.trace_add("write", lambda *args: self.update_attribute("format", format_var.get(), render=True))
             
             # Mostrar ejemplos de formatos comunes
             examples_frame = tk.Frame(props_frame, bg="#222")
@@ -999,11 +1128,7 @@ class LayoutEditor:
             direction_dropdown["menu"].config(bg="#444", fg="white")
             direction_dropdown.pack(side=tk.LEFT, padx=5)
             
-            # Advertencia sobre libraqm
-            warning_label = tk.Label(direction_frame, 
-                                   text="⚠️ Requiere libraqm", 
-                                   fg="#ffcc00", bg="#222", font=("Arial", 8))
-            warning_label.pack(side=tk.LEFT, padx=5)
+            # Advertencia sobre libraqm (suprimida para evitar UI intrusiva)
             
             # Avanzado: Anclaje de texto completo (align completo)
             advanced_align_frame = tk.Frame(props_frame, bg="#222")
@@ -1025,16 +1150,7 @@ class LayoutEditor:
             tk.Label(advanced_align_frame, text="(l=left, r=right, m=middle, t=top, b=bottom)", 
                     fg="#aaa", bg="#222", font=("Arial", 8)).pack(side=tk.LEFT, padx=5)
             
-            # Nota importante sobre libraqm
-            if not LIBRAQM_AVAILABLE:
-                note_frame = tk.Frame(props_frame, bg="#332200")
-                note_frame.pack(fill=tk.X, pady=5)
-                tk.Label(note_frame, 
-                       text="⚠️ NOTA: Tu instalación de Pillow no tiene libraqm.\n"
-                            "Los atributos de dirección de texto pueden no funcionar.\n"
-                            "Los cambios se guardarán pero no se mostrarán en la vista previa.",
-                       fg="#ffcc00", bg="#332200", justify=tk.LEFT,
-                       wraplength=280, padx=5, pady=5).pack(fill=tk.X)
+            # Nota sobre libraqm eliminada por problemas de UI (se conserva la advertencia breve más arriba)
             
         elif ctype == "icon":
             # Tamaño de icono
@@ -1083,14 +1199,31 @@ class LayoutEditor:
             )
             height_spin.pack(side=tk.LEFT, padx=5)
             
-            # Métrica
+            # Métrica (selector con etiquetas legibles)
             metric_frame = tk.Frame(props_frame, bg="#222")
             metric_frame.pack(fill=tk.X, pady=5)
             tk.Label(metric_frame, text="Métrica:", fg="white", bg="#222").pack(side=tk.LEFT)
-            metric_var = tk.StringVar(value=elem.attrib.get("metric", ""))
-            metric_entry = tk.Entry(metric_frame, textvariable=metric_var, width=10)
-            metric_entry.pack(side=tk.LEFT, padx=5)
-            metric_var.trace_add("write", lambda *args: self.update_attribute("metric", metric_var.get()))
+
+            # Reusar mapping si ya existe, sino definir básico
+            try:
+                metric_labels_list
+                metric_label_var_value = metric_labels.get(elem.attrib.get('metric',''), elem.attrib.get('metric',''))
+            except Exception:
+                # Definir mapeo mínimo
+                metric_labels = {'hr':'Heart rate (hr)','cadence':'Cadence','speed':'Speed','odo':'Odometer (odo)','dist':'Distance (dist)'}
+                label_to_short = {v:k for k,v in metric_labels.items()}
+                metric_labels_list = [v for k,v in metric_labels.items()]
+                metric_label_var_value = metric_labels.get(elem.attrib.get('metric',''), elem.attrib.get('metric',''))
+
+            metric_label_var = tk.StringVar(value=metric_label_var_value)
+
+            def on_bar_metric_selected(label):
+                short = label_to_short.get(label, label)
+                self.update_attribute('metric', short)
+
+            metric_menu = tk.OptionMenu(metric_frame, metric_label_var, *metric_labels_list, command=on_bar_metric_selected)
+            metric_menu.config(bg="#444", fg="white")
+            metric_menu.pack(side=tk.LEFT, padx=5)
             
             # Min/Max
             range_frame = tk.Frame(props_frame, bg="#222")
@@ -1108,6 +1241,300 @@ class LayoutEditor:
             max_entry.pack(side=tk.LEFT, padx=5)
             max_var.trace_add("write", lambda *args: self.update_attribute("max", max_var.get()))
         
+        elif ctype == "metric":
+            # Métricas soportadas (short codes)
+            metrics_list = [
+                'hr','cadence','speed','cspeed','temp','gradient','alt','odo','dist','azi','lat','lon',
+                'accl.x','accl.y','accl.z','grav.x','grav.y','grav.z','ori.pitch','ori.roll','ori.yaw',
+                'power','cog','respiration','gear.front','gear.rear','sdps'
+            ]
+
+            # Mapeo short -> etiqueta legible para mostrar en la UI
+            metric_labels = {
+                'hr': 'Heart rate (hr)',
+                'cadence': 'Cadence',
+                'speed': 'Speed',
+                'cspeed': 'Current speed (cspeed)',
+                'temp': 'Temperature (temp)',
+                'gradient': 'Gradient',
+                'alt': 'Altitude (alt)',
+                'odo': 'Odometer (odo)',
+                'dist': 'Distance (dist)',
+                'azi': 'Azimuth (azi)',
+                'lat': 'Latitude (lat)',
+                'lon': 'Longitude (lon)',
+                'accl.x': 'Accel X', 'accl.y': 'Accel Y', 'accl.z': 'Accel Z',
+                'grav.x': 'Grav X', 'grav.y': 'Grav Y', 'grav.z': 'Grav Z',
+                'ori.pitch': 'Orientation Pitch', 'ori.roll': 'Orientation Roll', 'ori.yaw': 'Orientation Yaw',
+                'power': 'Power', 'cog': 'Course over ground (cog)', 'respiration': 'Respiration',
+                'gear.front': 'Gear Front', 'gear.rear': 'Gear Rear', 'sdps': 'SDPS'
+            }
+
+            # Reverse mapping label -> short
+            label_to_short = {v: k for k, v in metric_labels.items()}
+
+            # List of labels to show (preserve order of metrics_list)
+            metric_labels_list = [metric_labels.get(k, k) for k in metrics_list]
+
+            # Métrica (selector con etiquetas legibles)
+            metric_frame = tk.Frame(props_frame, bg="#222")
+            metric_frame.pack(fill=tk.X, pady=5)
+            tk.Label(metric_frame, text="Métrica:", fg="white", bg="#222").pack(side=tk.LEFT)
+
+            # Variable para mostrar la etiqueta
+            cur_metric_short = elem.attrib.get("metric", "")
+            cur_metric_label = metric_labels.get(cur_metric_short, cur_metric_short)
+            metric_label_var = tk.StringVar(value=cur_metric_label)
+
+            def on_metric_label_selected(label):
+                # Map label back to short code (si no está, usar label como short)
+                short = label_to_short.get(label, label)
+                # Actualizar el XML y re-render
+                self.update_attribute('metric', short, render=True)
+                # Recargar menú de unidades acorde
+                try:
+                    reload_units_menu_for_metric(short)
+                except Exception:
+                    pass
+
+            metric_menu = tk.OptionMenu(metric_frame, metric_label_var, *metric_labels_list, command=on_metric_label_selected)
+            metric_menu.config(bg="#444", fg="white")
+            metric_menu.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+
+            # --- Preparar fuentes de unidades (Converters + UnitRegistry) ---
+            try:
+                from gopro_overlay.layout_xml import Converters
+                from gopro_overlay import units as units_module
+                conv = Converters()
+                conv_keys = list(conv.converters.keys())
+            except Exception:
+                conv_keys = []
+
+            try:
+                pint_keys = list(getattr(units_module.units, '_units', {}).keys()) if 'units_module' in locals() else []
+            except Exception:
+                pint_keys = []
+
+            all_units = sorted(set(conv_keys + pint_keys + ['','number','location']))
+
+            # Función que devuelve unidades sugeridas para una métrica concreta
+            def units_for_metric(metric_name: str):
+                m = (metric_name or '').lower()
+                mapping = {
+                    'speed': ['','mph','kph','mps','knots','speed','pace','pace_km','pace_mile'],
+                    'cspeed': ['','mph','kph','mps','knots','speed','pace','pace_km','pace_mile'],
+                    'dist': ['','distance','metres','miles','nautical_miles'],
+                    'odo': ['','distance','metres','miles'],
+                    'alt': ['','altitude','alt','feet','metres'],
+                    'temperature': ['','temp','temperature','degC'],
+                    'temp': ['','temp','temperature','degC'],
+                    'hr': ['','bpm','number'],
+                    'cadence': ['','spm','rpm','number'],
+                    'power': ['','W','number'],
+                    'gradient': ['','number','percent'],
+                    'azi': ['','degree','number'],
+                    'cog': ['','degree','number'],
+                    'lat': ['','location'],
+                    'lon': ['','location'],
+                }
+                # Si hay una entrada específica, retornarla (filtrando por lo disponible)
+                opts = mapping.get(m)
+                if opts:
+                    # Filtrar por unidades realmente disponibles, pero permitir valores arbitrarios
+                    filtered = [u for u in opts if (u == '' or u in conv_keys or u in pint_keys or u in ['number','location','percent','degree','W','rpm'])]
+                    # Asegurar que siempre hay al menos la opción vacía
+                    if '' not in filtered:
+                        filtered.insert(0, '')
+                    return filtered
+
+                # Fallback: devolver todas las unidades conocidas (sin duplicados)
+                return all_units
+
+            # La creación del menú de unidades se realizará más abajo, una vez creado el frame
+
+            # Unidades (menú desplegable poblado desde Converters y unidad personalizada)
+            units_frame = tk.Frame(props_frame, bg="#222")
+            units_frame.pack(fill=tk.X, pady=5)
+            tk.Label(units_frame, text="Unidades:", fg="white", bg="#222").pack(side=tk.LEFT)
+            units_var = tk.StringVar(value=elem.attrib.get("units", ""))
+
+            # Intentar obtener la lista de unidades soportadas por Converters
+            try:
+                from gopro_overlay.layout_xml import Converters
+                from gopro_overlay import units as units_module
+
+                conv = Converters()
+                conv_keys = list(conv.converters.keys())
+
+                # Intentar leer unidades registradas en pint (si es accesible)
+                pint_keys = []
+                try:
+                    # 'units' es un UnitRegistry; acceder a sus unidades registradas de forma segura
+                    pint_keys = list(getattr(units_module.units, '_units', {}).keys())
+                except Exception:
+                    pint_keys = []
+
+                units_options = sorted(set(conv_keys + pint_keys))
+            except Exception:
+                # Fallback con una lista razonable
+                units_options = ['','mph','kph','mps','knots','pace','pace_km','pace_mile','spm','speed','distance','altitude','feet','miles','metres','nautical_miles','number','location']
+
+            if '' not in units_options:
+                units_options.insert(0, '')
+
+            # Crear el menú de unidades inicialmente con las opciones generales
+            units_menu = tk.OptionMenu(units_frame, units_var, *units_options, command=lambda v: self.update_attribute("units", v, render=True))
+            units_menu.config(bg="#444", fg="white")
+            units_menu.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+
+            # Botón para introducir unidad personalizada
+            def set_custom_unit():
+                try:
+                    from tkinter import simpledialog
+                    val = simpledialog.askstring("Unidad personalizada", "Introduce la unidad (p.e. 'm' o 'km'):", initialvalue=units_var.get())
+                    if val is not None:
+                        units_var.set(val)
+                        self.update_attribute("units", val, render=True)
+                except Exception:
+                    val = None
+                    try:
+                        val = input('Introduce la unidad personalizada: ')
+                    except Exception:
+                        pass
+                    if val:
+                        units_var.set(val)
+                        self.update_attribute("units", val, render=True)
+
+            custom_btn = tk.Button(units_frame, text="Personalizada", command=set_custom_unit, bg="#555", fg="white", width=10)
+            custom_btn.pack(side=tk.LEFT, padx=5)
+
+            # Función para recargar las opciones del menú de unidades según la métrica seleccionada
+            def reload_units_menu_for_metric(metric_name):
+                opts = units_for_metric(metric_name)
+                menu = units_menu['menu']
+                menu.delete(0, 'end')
+
+                # Asegurar que la opción actual aparece (si no está en la lista) al inicio
+                cur = units_var.get()
+                if cur and cur not in opts:
+                    opts = [cur] + opts
+
+                for opt in opts:
+                    # crear comando que actualice la variable y el atributo XML
+                    def _cmd(v=opt):
+                        units_var.set(v)
+                        self.update_attribute('units', v, render=True)
+                    menu.add_command(label=opt, command=_cmd)
+
+            # Handler cuando cambie la métrica: actualizar atributo y recargar menú de unidades
+            def on_metric_change(*args):
+                # Obtener etiqueta seleccionada y mapear a short code
+                try:
+                    label = metric_label_var.get()
+                except Exception:
+                    label = ''
+                short = label_to_short.get(label, label)
+                # actualizar atributo en XML y re-renderizar
+                self.update_attribute('metric', short, render=True)
+                # recargar menú de unidades acorde a la métrica
+                try:
+                    reload_units_menu_for_metric(short)
+                except Exception:
+                    pass
+
+            # Conectar trazas: cuando cambie la métrica (etiqueta), actualizar también las unidades disponibles
+            metric_label_var.trace_add('write', on_metric_change)
+
+            # Inicializar menú según la métrica actual
+            try:
+                cur_label = metric_label_var.get()
+                reload_units_menu_for_metric(label_to_short.get(cur_label, cur_label))
+            except Exception:
+                pass
+
+            # Decimales (dp)
+            dp_frame = tk.Frame(props_frame, bg="#222")
+            dp_frame.pack(fill=tk.X, pady=5)
+            tk.Label(dp_frame, text="Decimales (dp):", fg="white", bg="#222").pack(side=tk.LEFT)
+            dp_var = tk.StringVar(value=elem.attrib.get("dp", ""))
+            dp_spin = tk.Spinbox(dp_frame, from_=0, to=10, textvariable=dp_var, width=5, command=lambda: self.update_attribute("dp", dp_var.get(), render=True))
+            dp_spin.pack(side=tk.LEFT, padx=5)
+            dp_var.trace_add("write", lambda *args: self.update_attribute("dp", dp_var.get(), render=True))
+
+            # Format (string) - puede ser '.4f' o 'pace'
+            format_frame = tk.Frame(props_frame, bg="#222")
+            format_frame.pack(fill=tk.X, pady=5)
+            tk.Label(format_frame, text="Format:", fg="white", bg="#222").pack(side=tk.LEFT)
+            format_var = tk.StringVar(value=elem.attrib.get("format", ""))
+            format_entry = tk.Entry(format_frame, textvariable=format_var)
+            format_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+            format_var.trace_add("write", lambda *args: self.update_attribute("format", format_var.get(), render=True))
+
+            # Cache
+            cache_frame = tk.Frame(props_frame, bg="#222")
+            cache_frame.pack(fill=tk.X, pady=5)
+            tk.Label(cache_frame, text="Caché:", fg="white", bg="#222").pack(side=tk.LEFT)
+            cache_var = tk.StringVar(value=elem.attrib.get("cache", "true"))
+            cache_dropdown = tk.OptionMenu(cache_frame, cache_var, "true", "false", command=lambda v: self.update_attribute("cache", v, render=True))
+            cache_dropdown.config(bg="#444", fg="white", width=6)
+            cache_dropdown.pack(side=tk.LEFT, padx=5)
+
+            # Tamaño de fuente
+            size_frame = tk.Frame(props_frame, bg="#222")
+            size_frame.pack(fill=tk.X, pady=5)
+            tk.Label(size_frame, text="Tamaño (size):", fg="white", bg="#222").pack(side=tk.LEFT)
+            size_var = tk.IntVar(value=int(elem.attrib.get("size", 14)))
+            size_spin = tk.Spinbox(size_frame, from_=5, to=200, textvariable=size_var, width=6, command=lambda: self.update_attribute("size", size_var.get(), render=True))
+            size_spin.pack(side=tk.LEFT, padx=5)
+
+            # Alineación
+            align_frame = tk.Frame(props_frame, bg="#222")
+            align_frame.pack(fill=tk.X, pady=5)
+            tk.Label(align_frame, text="Alineación:", fg="white", bg="#222").pack(side=tk.LEFT)
+            align_var = tk.StringVar(value=elem.attrib.get("align", "left"))
+            align_options = ["left", "center", "right", "lt", "mt", "rt", "lm", "mm", "rm", "lb", "mb", "rb"]
+            align_dropdown = tk.OptionMenu(align_frame, align_var, *align_options, command=lambda v: self.update_attribute("align", v, render=True))
+            align_dropdown.config(bg="#444", fg="white", width=10)
+            align_dropdown.pack(side=tk.LEFT, padx=5)
+
+            # Color RGB
+            color_frame = tk.Frame(props_frame, bg="#222")
+            color_frame.pack(fill=tk.X, pady=5)
+            tk.Label(color_frame, text="Color RGB:", fg="white", bg="#222").pack(anchor=tk.W)
+            rgb_input_frame = tk.Frame(color_frame, bg="#222")
+            rgb_input_frame.pack(fill=tk.X, pady=2)
+            rgb_var = tk.StringVar(value=elem.attrib.get("rgb", "255,255,255"))
+            rgb_entry = tk.Entry(rgb_input_frame, textvariable=rgb_var, width=15)
+            rgb_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            rgb_var.trace_add("write", lambda *args: self.update_attribute("rgb", rgb_var.get(), render=True))
+            color_preview = tk.Frame(rgb_input_frame, width=30, height=20, bg=self.rgb_to_hex(rgb_var.get()))
+            color_preview.pack(side=tk.LEFT, padx=5)
+            color_button = tk.Button(rgb_input_frame, text="Elegir color", command=lambda: self.open_color_picker(rgb_var, color_preview), bg="#336699", fg="white")
+            color_button.pack(side=tk.LEFT, padx=5)
+
+            # Contorno (outline)
+            outline_frame = tk.Frame(props_frame, bg="#222")
+            outline_frame.pack(fill=tk.X, pady=5)
+            tk.Label(outline_frame, text="Contorno:", fg="white", bg="#222").pack(anchor=tk.W)
+            outline_input_frame = tk.Frame(outline_frame, bg="#222")
+            outline_input_frame.pack(fill=tk.X, pady=2)
+            outline_var = tk.StringVar(value=elem.attrib.get("outline", "0,0,0,100"))
+            outline_entry = tk.Entry(outline_input_frame, textvariable=outline_var, width=15)
+            outline_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            outline_var.trace_add("write", lambda *args: self.update_attribute("outline", outline_var.get(), render=True))
+            outline_preview = tk.Frame(outline_input_frame, width=30, height=20, bg=self.rgb_to_hex(','.join(outline_var.get().split(',')[:3])))
+            outline_preview.pack(side=tk.LEFT, padx=5)
+            outline_button = tk.Button(outline_input_frame, text="Elegir contorno", command=lambda: self.open_outline_picker(outline_var, outline_preview), bg="#336699", fg="white")
+            outline_button.pack(side=tk.LEFT, padx=5)
+
+            # Ancho de contorno
+            outline_width_frame = tk.Frame(props_frame, bg="#222")
+            outline_width_frame.pack(fill=tk.X, pady=5)
+            tk.Label(outline_width_frame, text="Ancho contorno:", fg="white", bg="#222").pack(side=tk.LEFT)
+            outline_width_var = tk.IntVar(value=int(elem.attrib.get("outline_width", 1)))
+            outline_width_spin = tk.Spinbox(outline_width_frame, from_=0, to=20, textvariable=outline_width_var, width=6, command=lambda: self.update_attribute("outline_width", outline_width_var.get(), render=True))
+            outline_width_spin.pack(side=tk.LEFT, padx=5)
+        
         # Botón para ver/editar todos los atributos
         all_attrs_btn = tk.Button(
             props_frame, text="Ver todos los atributos", 
@@ -1115,12 +1542,7 @@ class LayoutEditor:
         )
         all_attrs_btn.pack(fill=tk.X, pady=10)
         
-        # Botón para renderizar de nuevo
-        rerender_btn = tk.Button(
-            self.side_panel, text="Renderizar cambios", 
-            command=self.rerender_layout, bg="#336699", fg="white"
-        )
-        rerender_btn.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 10))
+    # Nota: el botón persistente "Renderizar cambios" se crea en el constructor
     
     def rerender_layout(self):
         """Renderiza el layout y mantiene la selección actual"""
@@ -1300,27 +1722,56 @@ class LayoutEditor:
         self.selected = None
         self.selected_translate = None
         self._dragging = False
-        
-        # Buscar componente bajo el cursor
-        for item in reversed(self.items):  # Reversed para seleccionar el de arriba primero
-            abs_x = item["abs_x"] * self.zoom
-            abs_y = item["abs_y"] * self.zoom
-            width = item["width"] * self.zoom
-            height = item["height"] * self.zoom
-            
-            if abs_x <= x <= abs_x + width and abs_y <= y <= abs_y + height:
-                self.selected = item
-                print(f"[DEBUG] Seleccionado: {item['type']} en ({item['abs_x']}, {item['abs_y']})")
-                
-                # Guardar offset para arrastrar
-                self.drag_offset_x = x - abs_x
-                self.drag_offset_y = y - abs_y
-                
-                # Si es un componente que tiene translate, guardar referencia
-                if "translate" in item and item["translate"] is not None:
-                    self.selected_translate = item["translate"]
-                
-                break
+
+        # Primero, probar el item 'current' del canvas (el objeto bajo el cursor según las bindtags)
+        found = None
+        try:
+            current_items = list(self.canvas.find_withtag('current'))
+            for hid in reversed(current_items):
+                if hid in self._rect_to_index:
+                    idx = self._rect_to_index[hid]
+                    if 0 <= idx < len(self.items):
+                        found = self.items[idx]
+                        break
+        except Exception:
+            found = None
+
+        # Si no encontramos con 'current', probar find_overlapping
+        if found is None:
+            try:
+                hits = list(self.canvas.find_overlapping(x, y, x, y))
+                for hid in reversed(hits):
+                    if hid in self._rect_to_index:
+                        idx = self._rect_to_index[hid]
+                        if 0 <= idx < len(self.items):
+                            found = self.items[idx]
+                            break
+            except Exception:
+                found = None
+
+        # Si no encontramos con find_overlapping, fallback al método antiguo
+        if found is None:
+            for item in reversed(self.items):  # Reversed para seleccionar el de arriba primero
+                abs_x = item["abs_x"] * self.zoom
+                abs_y = item["abs_y"] * self.zoom
+                width = item["width"] * self.zoom
+                height = item["height"] * self.zoom
+
+                if abs_x <= x <= abs_x + width and abs_y <= y <= abs_y + height:
+                    found = item
+                    break
+
+        if found is not None:
+            self.selected = found
+            print(f"[DEBUG] Seleccionado: {found['type']} en ({found['abs_x']}, {found['abs_y']})")
+
+            # Guardar offset para arrastrar
+            self.drag_offset_x = x - (self.selected['abs_x'] * self.zoom)
+            self.drag_offset_y = y - (self.selected['abs_y'] * self.zoom)
+
+            # Si es un componente que tiene translate, guardar referencia
+            if 'translate' in self.selected and self.selected['translate'] is not None:
+                self.selected_translate = self.selected['translate']
         
         # Actualizar visualización
         self.update_component_visuals()
@@ -1395,6 +1846,30 @@ class LayoutEditor:
         
         # Actualizar visualización sin re-renderizar
         self.update_component_visuals()
+
+    def _on_rect_click(self, index, event):
+        """Handler para clicks en rectángulos de componente: selecciona el componente correspondiente."""
+        if index < 0 or index >= len(self.items):
+            return
+        item = self.items[index]
+        self.selected = item
+        if "translate" in item and item["translate"] is not None:
+            self.selected_translate = item["translate"]
+        else:
+            self.selected_translate = None
+
+        # Guardar offset para arrastrar
+        x = self.canvas.canvasx(event.x)
+        y = self.canvas.canvasy(event.y)
+        abs_x = item["abs_x"] * self.zoom
+        abs_y = item["abs_y"] * self.zoom
+        self.drag_offset_x = x - abs_x
+        self.drag_offset_y = y - abs_y
+
+        # Actualizar visuales y panel
+        self.update_component_visuals()
+        self.update_properties_panel()
+        self.print_component_details()
     
     def on_release(self, event):
         """Maneja el evento de soltar el botón del mouse"""
@@ -1727,32 +2202,32 @@ class LayoutEditor:
         
         help_text = """Opciones de alineación de texto (atributo 'align'):
 
-            Las opciones básicas son:
-            - 'left': Alinea el texto a la izquierda
-            - 'center': Centra el texto horizontalmente
-            - 'right': Alinea el texto a la derecha
+Las opciones básicas son:
+- 'left': Alinea el texto a la izquierda
+- 'center': Centra el texto horizontalmente
+- 'right': Alinea el texto a la derecha
 
-            Opciones avanzadas (anclas de texto):
-            El sistema de anclas de texto permite un control más preciso usando dos letras:
-            - Primera letra: posición horizontal (l=izquierda, m=medio, r=derecha)
-            - Segunda letra: posición vertical (t=arriba, m=medio, b=abajo)
+Opciones avanzadas (anclas de texto):
+El sistema de anclas de texto permite un control más preciso usando dos letras:
+- Primera letra: posición horizontal (l=izquierda, m=medio, r=derecha)
+- Segunda letra: posición vertical (t=arriba, m=medio, b=abajo)
 
-            Por ejemplo:
-            - 'lt': Arriba a la izquierda (Left-Top)
-            - 'mt': Arriba en el centro (Middle-Top)
-            - 'rt': Arriba a la derecha (Right-Top)
-            - 'lm': Centro izquierda (Left-Middle)
-            - 'mm': Centro absoluto (Middle-Middle)
-            - 'rm': Centro derecha (Right-Middle)
-            - 'lb': Abajo a la izquierda (Left-Bottom)
-            - 'mb': Abajo en el centro (Middle-Bottom)
-            - 'rb': Abajo a la derecha (Right-Bottom)
+Por ejemplo:
+- 'lt': Arriba a la izquierda (Left-Top)
+- 'mt': Arriba en el centro (Middle-Top)
+- 'rt': Arriba a la derecha (Right-Top)
+- 'lm': Centro izquierda (Left-Middle)
+- 'mm': Centro absoluto (Middle-Middle)
+- 'rm': Centro derecha (Right-Middle)
+- 'lb': Abajo a la izquierda (Left-Bottom)
+- 'mb': Abajo en el centro (Middle-Bottom)
+- 'rb': Abajo a la derecha (Right-Bottom)
 
-            Estas opciones controlan el punto de anclaje del texto en relación a las coordenadas x,y especificadas.
+Estas opciones controlan el punto de anclaje del texto en relación a las coordenadas x,y especificadas.
 
-            Para más información, consulta la documentación de Pillow sobre text anchors:
-            https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html
-            """
+Para más información, consulta la documentación de Pillow sobre text anchors:
+https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html
+"""
         
         text.insert(tk.END, help_text)
         text.config(state=tk.DISABLED)
