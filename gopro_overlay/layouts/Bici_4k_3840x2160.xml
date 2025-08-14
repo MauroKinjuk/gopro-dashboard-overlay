@@ -1,0 +1,127 @@
+<layout>
+    -- FC, KMH, Cadencia, Deg --
+    <translate x="100" y="120">
+
+        -- Frec Cardiaca --
+        <translate x="0" y="1300">
+            -- Barra --
+            <translate x="0"  y="150">
+                <!--<component type="bar" metric="hr" width="480" height="75" min="0" max="210" outline="229,152,102,50" bar="220,117,51,90" h-pos="211,84,0" fill="66,73,73,85" /> -->
+                <!-- <component type="zone-bar" metric="hr" min="90" max="194" z1="136" z2="156" z3="175" z0-rgb="88,214,141" z1-rgb="244,208,63" z2-rgb="235,152,78" z3-rgb="205,97,85"
+                            zone-divider="125,125,125" outline="229,152,102,80" width="480" height="75"/> -->
+                <component type="zone-bar" metric="hr" min="90" max="194" z1="136" z2="156" z3="175" z0-rgb="66,176,112" z1-rgb="255,195,0" z2-rgb="230,126,34" z3-rgb="192,57,43"
+                            zone-divider="90,90,90" outline="13,109,250,90" width="480" height="75"/>
+            </translate>
+            -- Numero --
+            <translate x="250"  y="140">
+                    <component type="metric" metric="hr" dp="0" size="75" align="right"/>
+            </translate>
+            -- Texto --
+            <translate x="290"  y="140">
+                    <component type="text" size="75" align="left" outline="0,0,0,100">BPM</component>
+            </translate>
+            -- Icono --
+            <component type="icon" x="20" y="160" file="heartbeat.png" size="55"/>
+        </translate>
+
+        -- KMH --
+        <translate x="0" y="1400">
+            -- Barra --
+            <translate x="0"  y="150">
+                <!--<component type="bar" metric="speed" units="km/h" width="480" height="75" min="0" max="60" outline="229,152,102,80" bar="220,117,51,100" h-pos="211,84,0" fill="66,73,73,85" /> -->
+                <component type="bar" metric="speed" units="km/h" width="480" height="75" min="0" max="45" outline="13,109,250,90" bar="235,24,0,100" h-pos="13,109,250" fill="66,73,73,85"/>
+            </translate>
+            -- Numero --
+            <translate x="250"  y="140">
+                    <component type="metric" metric="speed" units="kph" dp="0" size="75" align="right"/>
+            </translate>
+            -- Texto --
+            <translate x="290"  y="140">
+                    <component type="text" size="75" align="left" outline="0,0,0,100">KM/H</component>
+            </translate>
+            -- Icono --
+            <component type="icon" x="20" y="160" file="speedometer-variant-tool-symbol.png" size="55"/>
+        </translate>
+
+        -- Cadencia --
+        <translate x="0" y="1500">
+            -- Barra --
+            <translate x="0"  y="150">
+                <!--<component type="bar" metric="cadence" width="480" height="75" min="0" outline="229,152,102,80" bar="220,117,51,100" h-pos="211,84,0" fill="66,73,73,85" /> -->
+                <component type="bar" metric="cadence" width="480" height="75" min="0" max="130"  outline="13,109,250,90" bar="235,24,0,100" h-pos="13,109,250" fill="66,73,73,85" />
+            </translate>
+            -- Numero --
+            <translate x="250"  y="140">
+                    <component type="metric" metric="cadence" dp="0" size="75" align="right"/>
+            </translate>
+            -- Texto --
+            <translate x="290"  y="140">
+                    <component type="text" size="75" align="left" outline="0,0,0,100">RPM</component>
+            </translate>
+            -- Icono --
+            <component type="icon" x="20" y="160" file="gauge.png" size="55"/>
+        </translate>
+
+        -- Pendiente --
+        <translate x="0" y="1600">
+            -- Barra --
+            <translate x="0"  y="150">
+                <!-- <component type="bar" metric="gradient" width="480" height="75" outline="229,152,102,80" bar="220,117,51,100" h-pos="211,84,0" fill="66,73,73,85" /> -->
+                <component type="bar" metric="gradient" width="480" height="75" outline="13,109,250,90" bar="235,24,0,100" h-pos="13,109,250" fill="66,73,73,85" />
+            </translate>
+            -- Numero --
+            <translate x="250"  y="140">
+                    <component type="metric" metric="gradient" dp="1" size="75" align="right"/>
+            </translate>
+            -- Texto --
+            <translate x="290"  y="140">
+                    <component type="text" size="75" align="left" outline="0,0,0,100">DEG</component>
+            </translate>
+            -- Icono --
+            <component type="icon" x="20" y="160" file="slope-triangle.png" size="55"/>
+        </translate>
+       
+    </translate>
+   
+    -- Distancia y Tiempo --
+    <translate x="1920" y="0">
+        -- Tiempo --
+        <translate x="-1200"  y="80">
+        <component type="datetime" format="%H:%M:%S" size="55" />
+        </translate>
+        -- Barra --
+        <translate x="-1000"  y="80">
+            <!-- <component type="bar" metric="odo" units="km" width="2000" height="75" min="0" max="87" outline="229,152,102,80" bar="220,117,51,100" h-pos="211,84,0" fill="66,73,73,85" /> -->
+            <component type="bar" metric="odo" units="km" width="2000" height="75" min="0" max="30" outline="13,109,250,90" bar="235,24,0,100" h-pos="13,109,250" fill="66,73,73,85" />
+        </translate>
+        -- Numero --
+        <translate x="830"  y="75">
+            <component type="metric" metric="odo" units="km" dp="1" size="65" align="right" />
+        </translate>
+        <translate x="830"  y="80">
+            <component type="text" size="55" rgb="125,125,125"> / 29.6</component>
+        </translate>
+        -- Icono --
+        <component type="icon" x="680" y="90" file="ruler.png" size="45"/>
+    </translate>
+
+    -- Mapa --
+    <translate x="3000" y="50">
+        <component type="cairo_circuit_map" size="800" fill="228,228,228" outline="0,0,0,80" loc-fill="255,255,255" loc-size="0.02" rotate="0" />
+    </translate>
+
+    -- Altitud --
+    <!--<translate x="-250" y="1960">
+        <component type="chart" height="200" seconds="100" fill="240,240,240,90" bg="0,0,0,0" samples="1024" textsize="48" metric="alt" units="m"/>
+        <component type="text" y="80" size="32" rgb="255,255,255,128">Alt(m)</component>
+    </translate> -->
+
+    <composite name="metrics" x="300" y="1800">
+            <!--<component type="datetime" x="10"  y="70" format="%H:%M:%S" size="50" align="right"/> -->
+            -- Altitud --
+            <!--<translate x="1500" y="260">        
+                <component type="text" x="150" y="0"  size="60" outline="0,0,0,80">m</component>
+                <component type="metric" x="0" y="0" align="left"  metric="alt" dp="1" size="60" outline="0,0,0,80" />
+            </translate> -->
+        </composite>
+</layout>

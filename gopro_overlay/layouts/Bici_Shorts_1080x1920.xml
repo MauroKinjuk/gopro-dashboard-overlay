@@ -1,0 +1,64 @@
+<layout>
+    -- FC, KMH, Cadencia, Deg --
+    <translate x="50" y="1200">   
+        -- Frec Cardiaca --
+        <translate x="0" y="100">
+            -- Barra --
+            <translate x="0"  y="50">
+                <component type="zone-bar" metric="hr" min="90" max="194" z1="136" z2="156" z3="175" z0-rgb="88,214,141" z1-rgb="244,208,63" z2-rgb="235,152,78" z3-rgb="205,97,85" 
+                            zone-divider="125,125,125" outline="229,152,102,50" width="400" height="50"/>
+            </translate>
+            -- Numero --
+            <translate x="200"  y="43">
+                <component type="metric" metric="hr" dp="0" size="50" align="right"/>
+            </translate>
+            -- Texto --
+            <translate x="240"  y="43">
+                <component type="text" size="50" align="left" outline="0,0,0,80">BPM</component>
+            </translate>
+            -- Icono --
+            <component type="icon" x="20" y="55" file="heartbeat.png" size="40"/>
+        </translate>
+
+        -- KMH --
+        <translate x="0" y="200">
+            -- Barra --
+            <translate x="0"  y="50">
+                <component type="bar" metric="speed" units="km/h" width="400" height="50" min="0" max="60" outline="229,152,102,50" bar="220,117,51,90" h-pos="211,84,0" fill="66,73,73,85" />
+            </translate>
+            -- Numero --
+            <translate x="200"  y="43">
+                <component type="metric" metric="speed" units="kph" dp="0" size="50" align="right"/>
+            </translate>
+            -- Texto --
+            <translate x="240"  y="43">
+                <component type="text" size="50" align="left" outline="0,0,0,80">KM/H</component>
+            </translate>
+            -- Icono --
+            <component type="icon" x="20" y="55" file="speedometer-variant-tool-symbol.png" size="40"/>
+        </translate>
+
+        -- Cadencia --
+        <translate x="0" y="300">
+            -- Barra --
+            <translate x="0"  y="50">
+                <component type="bar" metric="cadence" width="400" height="50" min="0" outline="229,152,102,50" bar="220,117,51,90" h-pos="211,84,0" fill="66,73,73,85" />
+            </translate>
+            -- Numero --
+            <translate x="200"  y="43">
+                <component type="metric" metric="cadence" dp="0" size="50" align="right"/>
+            </translate>
+            -- Texto --
+            <translate x="240"  y="43">
+                <component type="text" size="50" align="left" outline="0,0,0,80">RPM</component>
+            </translate>
+            -- Icono --
+            <component type="icon" x="20" y="55" file="gauge.png" size="40"/>
+        </translate>
+    </translate>
+
+    -- Mapa --
+    <!-- <translate x="150" y="1400">
+        <component type="cairo_circuit_map" size="500" fill="228,228,228" outline="0,0,0,80" loc-fill="255,255,255" loc-size="0.02" rotate="0" />
+    </translate> -->
+</layout>
