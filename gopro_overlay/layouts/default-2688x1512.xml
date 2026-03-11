@@ -36,7 +36,7 @@
             <component type="metric" x="70" y="18" metric="alt" units="alt" dp="0" size="32" />
         </composite>
 
-        <component type="chart" name="gradient_chart" x="400" y="0"/>
+        <component type="chart" name="gradient_chart" x="400" y="0" units="alt" />
     </translate>
 
     <translate x="2650" y="1200">

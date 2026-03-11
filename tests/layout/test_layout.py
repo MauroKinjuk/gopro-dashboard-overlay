@@ -36,6 +36,33 @@ def test_render_default_layout():
 
 
 @approve_image
+def test_render_default_layout_with_converters():
+    # Avg: 0.01550, Rate: 64.53
+
+    xmldoc = load_xml_layout(Path("default-1920x1080"))
+
+    unit_converters = Converters(
+        speed_unit="kph",
+        distance_unit="mm",
+        altitude_unit="foot",
+        temperature_unit="kelvin",
+    )
+
+    with renderer.open() as map_renderer:
+        return time_layout(
+            "default",
+            layout_from_xml(
+                xmldoc,
+                map_renderer,
+                framemeta,
+                font,
+                converters=unit_converters,
+                privacy=NoPrivacyZone()
+            )
+        )
+
+
+@approve_image
 def test_render_default_layout_different_units():
     xmldoc = load_xml_layout(Path("default-1920x1080"))
 
