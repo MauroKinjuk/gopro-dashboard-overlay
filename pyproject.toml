@@ -8,13 +8,12 @@ version = "0.130.0"
 description = "Overlay graphics dashboards onto GoPro footage, or create videos from GPX or FIT files"
 readme = "README-PYPI.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "GPL-3.0-or-later"
 authors = [
     {name = "James Richardson", email = "james+gopro@time4tea.net"}
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.12",
