@@ -169,6 +169,8 @@ You can cut a section of the gopro file, with metadata.
 
 ## Related Software
 
+- https://github.com/Romancha/GPStitch - A VERY nice web user interface for this program.
+
 - https://github.com/julesgraus/interactiveGoProDashboardTool - An interactive helper to build the command line for the dashboard program
 
 ## Known Bugs / Issues
@@ -197,9 +199,10 @@ https://coderunner.io/how-to-compress-gopro-movies-and-keep-metadata/
 
 ## Other Related Software
 
-https://github.com/progweb/gpx2video
 
-https://github.com/JuanIrache/gopro-telemetry
+- https://github.com/progweb/gpx2video
+
+- https://github.com/JuanIrache/gopro-telemetry
 
 ## Latest Changes
 
