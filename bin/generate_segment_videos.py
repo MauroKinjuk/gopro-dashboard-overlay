@@ -388,7 +388,9 @@ def main():
                         help="Archivo de fuente TTF")
     parser.add_argument("--filter", type=str, default=None,
                         help="Filtrar segmentos por nombre")
-    
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Limitar cantidad de segmentos a procesar (ej: 1 para solo el primero)")
+
     args = parser.parse_args()
     
     if not args.segments.exists():
@@ -404,7 +406,11 @@ def main():
     if args.filter:
         segments = [s for s in segments if args.filter.lower() in s['name'].lower()]
         log(f"Filtrados: {len(segments)} segmentos")
-    
+
+    if args.limit:
+        segments = segments[:args.limit]
+        log(f"Limitado a {len(segments)} segmento(s)")
+
     # Generar videos
     generator = LeaderboardVideoGenerator(
         output_dir=args.output_dir,

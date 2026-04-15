@@ -301,6 +301,9 @@ python build_segment_overlay_data.py --gpx "ruta/a/MiCarrera.gpx" --activity-url
 # 2. Generar videos de leaderboard (un video por segmento)
 python bin\generate_segment_videos.py --segments segments_timed.json --output-dir ./segment_videos
 
+# 2b. Generar solo los primeros N segmentos (ej: solo el primero)
+python bin\generate_segment_videos.py --segments segments_timed.json --output-dir ./segment_videos --limit 1
+
 # 3. Los videos estan en segment_videos/ - importalos en CapCut!
 ```
 

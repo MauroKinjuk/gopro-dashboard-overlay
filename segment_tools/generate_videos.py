@@ -341,7 +341,7 @@ class LeaderboardVideoGenerator:
         arrow_t = ease_out_bounce(clamp((t - 0.65) / 0.35))
         if arrow_t > 0.01:
             fa   = self.font(13)
-            atxt = "▼  ver leaderboard  ▼"
+            atxt = "▼  Leaderboard  ▼"
             bx   = draw.textbbox((0, 0), atxt, font=fa)
             aw   = bx[2] - bx[0]
             ay   = y2 - 28 + int((1 - arrow_t) * 16)
@@ -550,7 +550,7 @@ class LeaderboardVideoGenerator:
             hl  = self.HIGHLIGHT
             ty  = my_row_y + 10 + slide_yd
             draw.text((self.col_rank_x,  ty), str(my_pos),                           font=fn, fill=hl)
-            draw.text((self.col_name_x,  ty), "TÚ",                                  font=fn, fill=hl)
+            draw.text((self.col_name_x,  ty), "Mauro en Bici",                                  font=fn, fill=hl)
             draw.text((self.col_speed_x, ty), str(segment.get('my_speed', '')),      font=fn, fill=hl)
             draw.text((self.col_time_x,  ty), str(segment.get('my_time',  '')),      font=fn, fill=hl)
 
@@ -772,6 +772,8 @@ def main():
     parser.add_argument("--font",        type=Path,  default=None)
     parser.add_argument("--filter",      type=str,   default=None,
                         help="Filtrar segmentos por nombre (substring)")
+    parser.add_argument("--limit",       type=int,   default=None,
+                        help="Limitar cantidad de segmentos a procesar")
     args = parser.parse_args()
 
     if not args.segments.exists():
@@ -792,6 +794,10 @@ def main():
     if args.filter:
         segments = [s for s in segments if args.filter.lower() in s['name'].lower()]
         log(f"Filtrados: {len(segments)} segmentos")
+
+    if args.limit:
+        segments = segments[:args.limit]
+        log(f"Limitado a {len(segments)} segmento(s)")
 
     gen = LeaderboardVideoGenerator(
         output_dir=args.output_dir,
