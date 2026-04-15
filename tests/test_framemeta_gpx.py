@@ -6,7 +6,7 @@ from gopro_overlay.point import Point
 from gopro_overlay.timeseries import Entry
 from gopro_overlay.timeunits import timeunits
 from gopro_overlay.units import metres
-from tests.test_timeseries import datetime_of
+from test_timeseries import datetime_of
 
 
 def test_converting_framemeta_to_gpx():

@@ -10,8 +10,8 @@ from gopro_overlay.widgets.cairo.line import LineParameters
 from gopro_overlay.widgets.cairo.needle_sector import SectorNeedle, SectorArc
 from gopro_overlay.widgets.cairo.reading import Reading
 from gopro_overlay.widgets.cairo.tick import TickParameters
-from tests.approval import approve_image
-from tests.widgets.cairo.test_widgets_cairo import cairo_widget_test
+from approval import approve_image
+from widgets.cairo.test_widgets_cairo import cairo_widget_test
 
 
 @pytest.mark.cairo

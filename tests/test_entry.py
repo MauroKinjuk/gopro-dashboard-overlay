@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from gopro_overlay.entry import Entry
-from tests.test_timeseries import datetime_of, metres
+from test_timeseries import datetime_of, metres
 
 
 def test_interpolating_entry():

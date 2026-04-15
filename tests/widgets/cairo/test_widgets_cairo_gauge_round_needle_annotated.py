@@ -4,8 +4,8 @@ from gopro_overlay.widgets.cairo.angle import Angle
 from gopro_overlay.widgets.cairo.colour import RED, Colour, WHITE, BLACK
 from gopro_overlay.widgets.cairo.gauge_round_254 import CairoGaugeRoundAnnotated
 from gopro_overlay.widgets.cairo.reading import Reading
-from tests.approval import approve_image
-from tests.widgets.cairo.test_widgets_cairo import cairo_widget_test
+from approval import approve_image
+from widgets.cairo.test_widgets_cairo import cairo_widget_test
 
 
 @pytest.mark.cairo

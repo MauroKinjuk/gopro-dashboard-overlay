@@ -1,6 +1,6 @@
 from gopro_overlay.dimensions import Dimension
 from gopro_overlay.widgets.cairo.cairo import CairoAdapter
-from tests.widgets.test_widgets import time_rendering
+from widgets.test_widgets import time_rendering
 
 
 def cairo_widget_test(widget, repeat=1):

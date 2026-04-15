@@ -280,7 +280,22 @@ venv/bin/gopro-dashboard.py --use-gpx-only --gpx ~/Downloads/Morning_Ride.gpx --
 
 This is currently quite hard to align things properly!
 
-#### Ensure file time matches GPX times
+#### Use MP4 creation time (recommended for cloud-downloaded videos)
+
+If the video was downloaded from a cloud service (GoPro Cloud, Google Photos, etc.), the filesystem timestamps
+(created/modified/accessed) will reflect the download time, not the actual recording time.
+
+In this case, use `video-created` which reads the `creation_time` tag embedded in the MP4 container metadata.
+This timestamp is set by the camera at recording time and survives downloads and file transfers.
+
+```shell
+venv/bin/gopro-dashboard.py --video-time-start video-created --use-gpx-only --gpx ~/Downloads/Morning_Ride.gpx ~/recording/drive.MP4 GH020073-dashboard.MP4
+```
+
+If no `creation_time` is found in the video metadata, the program will exit with a helpful error message
+suggesting you use one of the file-based options instead.
+
+#### Use file timestamps
 
 Make sure that the time of the file is correct and when aligned to the timezone of your computer matches the data in GPX file 
 (this might not be the case if video is recorded abroad). 
@@ -406,11 +421,13 @@ GPX Only:
 
   --use-gpx-only, --use-fit-only
                         Use only the GPX/FIT file - no GoPro location data (default: False)
-  --video-time-start {file-created,file-modified,file-accessed}
-                        Use file dates for aligning video and GPS information, only when --use-gpx-only -
+  --video-time-start {file-created,file-modified,file-accessed,video-created}
+                        Use file/video dates for aligning video and GPS information, only when --use-gpx-only.
+                        'video-created' reads the creation_time embedded in the MP4 metadata - 
                         EXPERIMENTAL! - may be changed/removed (default: None)
-  --video-time-end {file-created,file-modified,file-accessed}
-                        Use file dates for aligning video and GPS information, only when --use-gpx-only -
+  --video-time-end {file-created,file-modified,file-accessed,video-created}
+                        Use file/video dates for aligning video and GPS information, only when --use-gpx-only.
+                        'video-created' reads the creation_time embedded in the MP4 metadata -
                         EXPERIMENTAL! - may be changed/removed (default: None)
 
 Mapping:

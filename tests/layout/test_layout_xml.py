@@ -4,7 +4,7 @@ from gopro_overlay.layout_components import metric_value
 from gopro_overlay.layout_xml import metric_accessor_from, date_formatter_from, Converters, quantity_formatter_for
 from gopro_overlay.timeseries import Entry
 from gopro_overlay.units import units
-from tests.test_timeseries import datetime_of
+from test_timeseries import datetime_of
 
 
 def test_metric_accessor_speed():

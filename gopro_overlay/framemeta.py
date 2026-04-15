@@ -211,6 +211,19 @@ class FrameMeta:
                 if updates:
                     entry_a.update(**updates)
 
+        # The forward-pairing loop above leaves the last `skip` entries without values.
+        # Pair them backwards with an earlier entry at the same distance, storing the
+        # result on the later entry. The delta is identical, just attributed to b not a.
+        for idx in range(len(self.framelist) - skip, len(self.framelist)):
+            a = self.framelist[idx - skip]
+            b = self.framelist[idx]
+            entry_a = self.frames[a]
+            entry_b = self.frames[b]
+            if filter_fn(entry_a) and filter_fn(entry_b):
+                updates = processor(entry_a, entry_b, skip)
+                if updates:
+                    entry_b.update(**updates)
+
     def process_accel(self, processor, skip=1, filter_fn: Callable[[Entry], bool] = lambda e: True):
         self.check_modified()
         diffs = list(zip(self.framelist, self.framelist[skip:]))

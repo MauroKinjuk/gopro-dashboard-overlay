@@ -2,7 +2,7 @@ import random
 from datetime import timedelta
 
 from gopro_overlay import fake
-from tests.font import load_test_font
+from font import load_test_font
 
 font = load_test_font().font_variant(size=18)
 title_font = font.font_variant(size=16)

@@ -5,7 +5,7 @@ from gopro_overlay.ffmpeg_overlay import FFMPEGOverlay
 from gopro_overlay.point import Coordinate
 from gopro_overlay.widgets.text import CachingText
 from gopro_overlay.widgets.widgets import Scene, SimpleFrameSupplier
-from tests.font import load_test_font
+from font import load_test_font
 
 font = load_test_font()
 

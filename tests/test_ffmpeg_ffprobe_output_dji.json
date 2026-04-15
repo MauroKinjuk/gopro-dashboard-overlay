@@ -1,4 +1,9 @@
 {
+    "format": {
+        "tags": {
+            "creation_time": "2025-07-31T23:48:39.000000Z"
+        }
+    },
     "streams": [
         {
             "index": 0,

@@ -5,10 +5,9 @@ import pathlib
 from functools import partial
 from typing import Optional, Tuple, List, Dict
 
-import geotiler
-from geotiler.cache import caching_downloader
-from geotiler.provider import MapProvider
-from geotiler.tile.io import fetch_tiles
+from .vendor.geotiler.cache import caching_downloader
+from .vendor.geotiler.provider import MapProvider
+from .vendor.geotiler.tile.io import fetch_tiles
 from sqlitedict import SqliteDict
 
 from gopro_overlay.config import Config

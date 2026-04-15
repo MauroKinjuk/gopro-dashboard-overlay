@@ -101,8 +101,9 @@ def load_timeseries(filepath: Path, units):
                             d = interpret[k](event_frame[k], units)
                             item.update(d)
 
-                    if last_ts_event.dt == timestamp:
-                        last_ts_event.update(**item)
+                    if last_ts_event is not None:
+                        if timestamp == last_ts_event.dt:
+                            last_ts_event.update(**item)
             else:
                 pass
 

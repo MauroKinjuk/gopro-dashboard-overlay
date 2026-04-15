@@ -13,9 +13,9 @@ from gopro_overlay.widgets.info import ComparativeEnergy
 from gopro_overlay.widgets.map import OutLine
 from gopro_overlay.widgets.text import CachingText, Text
 from gopro_overlay.widgets.widgets import simple_icon, Scene, Composite, Translate, Widget, SimpleFrameSupplier
-from tests.widgets import test_widgets_setup
-from tests.approval import approve_image
-from tests.testenvironment import is_make
+from widgets import test_widgets_setup
+from approval import approve_image
+from testenvironment import is_make
 
 font = test_widgets_setup.font
 ts = test_widgets_setup.ts

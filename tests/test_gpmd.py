@@ -19,7 +19,7 @@ from gopro_overlay.gpmf.visitors.xyz import XYZComponentConverter, XYZVisitor
 from gopro_overlay.point import Point, Point3, Quaternion
 from gopro_overlay.timeunits import timeunits
 from gopro_overlay.units import units
-from tests.test_framedata import load_file
+from test_framedata import load_file
 
 
 def path_of_meta(name) -> Path:

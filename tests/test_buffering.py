@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw
 
 from gopro_overlay.buffering import Frame
 from gopro_overlay.dimensions import Dimension
-from tests.approval import approve_image
+from approval import approve_image
 
 size = Dimension(256, 256)
 buffer_size = (size.x * size.y * 4)

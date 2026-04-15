@@ -16,7 +16,7 @@ from gopro_overlay.point import Point, BoundingBox
 from gopro_overlay.timeseries import Entry, Timeseries
 from gopro_overlay.timeunits import timeunits
 from gopro_overlay.units import units
-from tests.test_timeseries import datetime_of
+from test_timeseries import datetime_of
 
 
 def simple_gpx_file(entry):

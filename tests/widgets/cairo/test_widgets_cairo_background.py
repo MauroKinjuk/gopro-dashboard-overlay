@@ -7,8 +7,8 @@ from gopro_overlay.widgets.cairo.cairo import CairoCache
 from gopro_overlay.widgets.cairo.colour import BLACK, Colour, WHITE
 from gopro_overlay.widgets.cairo.ellipse import Arc, EllipseParameters
 from gopro_overlay.widgets.cairo.background import CairoEllipticBackground
-from tests.approval import approve_image
-from tests.widgets.cairo.test_widgets_cairo import cairo_widget_test
+from approval import approve_image
+from widgets.cairo.test_widgets_cairo import cairo_widget_test
 
 
 @pytest.mark.cairo

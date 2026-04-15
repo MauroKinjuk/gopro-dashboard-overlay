@@ -1,0 +1,6 @@
+{
+    "name": "OpenStreetMap",
+    "attribution": "© OpenStreetMap contributors\nhttp://www.openstreetmap.org/copyright",
+    "url": "http://tile.openstreetmap.org/{z}/{x}/{y}.{ext}",
+    "limit": 2
+}

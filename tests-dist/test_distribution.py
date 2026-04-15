@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 from gopro_overlay.process import invoke, run
-from tests.approval import approve_text
+from textapproval import approve_text
 
 mydir = Path(os.path.dirname(__file__))
 top = mydir.parent

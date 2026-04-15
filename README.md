@@ -169,6 +169,8 @@ You can cut a section of the gopro file, with metadata.
 
 ## Related Software
 
+- https://github.com/Romancha/GPStitch - A VERY nice web user interface for this program.
+
 - https://github.com/julesgraus/interactiveGoProDashboardTool - An interactive helper to build the command line for the dashboard program
 
 ## Known Bugs / Issues
@@ -197,13 +199,20 @@ https://coderunner.io/how-to-compress-gopro-movies-and-keep-metadata/
 
 ## Other Related Software
 
-https://github.com/progweb/gpx2video
 
-https://github.com/JuanIrache/gopro-telemetry
+- https://github.com/progweb/gpx2video
+
+- https://github.com/JuanIrache/gopro-telemetry
 
 ## Latest Changes
 
 If you find any issues with new releases, please discuss in [GitHub Discussions](https://github.com/time4tea/gopro-dashboard-overlay/discussions)
+- 0.133.0 - [Enhancement] Chart - Add `width` and `marker-size`, better interpolation of datapoints at end of file, and use date from video file, with `--video-time-start video-start` - thanks to [@derFunk](https://github.com/derFunk) for contributing
+- 0.132.0 - [Enhancement] Use user-supplied unit pref for chart - thanks to [@DonkeyShine](https://github.com/DonkeyShine) for noticing
+- 0.131.0 [Enhancement] - Improved parsing of FIT files with gear changes thanks to  [@geomandolyn](https://github.com/geomandolyn) to raising issue & sample data.
+- 0.130.0 [Enhancement] - New capability to update the journey map & moving journey map - path and location styling.  Mulţumesc mult to [@andrei-micuda](https://github.com/andrei-micuda)
+  - [Hopefully no visible effect] Vendored / Copied in source code from geotiler as it's no longer compatible with new python versions & updated to be compatible. 
+- 0.129.0 [Enhancement] [Breaking] - Update python compatibility - Newly Compatible: 3.13, 3.14. No longer compatible 3.9, 3.10 
 - 0.128.0 [Enhancement] add layout default compatible ith DJI 2.5k resolution. Thanks to [@DonkeyShine](https://github.com/DonkeyShine) for suggestion.
 - 0.127.0 [Enhancement] Now support _respiration_ , _front_gear_num_ and _rear_gear_num fields in FIT files. Improved support for using DJI videos as files to be overlaid. 
   - Thanks to [@prebbz](https://github.com/prebbz) [@DonkeyShine](https://github.com/DonkeyShine) 

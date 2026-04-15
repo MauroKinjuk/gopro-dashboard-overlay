@@ -1,5 +1,5 @@
 # for drawing text/images
-pillow==10.1.0
+pillow==11.3.0
 # pint for unit conversion
 pint==0.22
 # for drawing little map
@@ -11,6 +11,6 @@ fitdecode==0.10.0
 # for lat/lon/speed calcs
 geographiclib==1.52
 progressbar2==4.2.0
-requests==2.31.0
-pycairo==1.23.0
+requests==2.32.4
+pycairo==1.28.0
 sqlitedict==2.1.0

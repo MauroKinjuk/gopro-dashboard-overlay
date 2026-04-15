@@ -6,7 +6,7 @@ from pint.registry import Quantity
 
 from gopro_overlay import fit
 from gopro_overlay.units import units
-from tests.test_gpx import file_path_of_test_asset
+from test_gpx import file_path_of_test_asset
 
 
 def test_converting_fit_without_power_to_timeseries():
@@ -37,6 +37,14 @@ def test_converting_fit_with_power_to_timeseries():
     assert item.power == units.Quantity(80, units.watt)
     assert item.odo == units.Quantity(114.96, units.m)
     assert item.gpsfix == 3
+
+
+def test_converting_fit_with_gear_changes_and_power_data_bugfix():
+    p = file_path_of_test_asset("issue-272.fit", in_dir="fit", allow_missing=True)
+    if p is None:
+        pytest.skip("Private test asset not present")
+
+    fit.load_timeseries(p,units)
 
 
 def test_converting_fit_with_gear_changes_and_respiration():

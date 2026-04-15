@@ -1,1 +1,1 @@
-pytest_plugins = ("plugins.verdicts",)
+#pytest_plugins = ("plugins.verdicts",)

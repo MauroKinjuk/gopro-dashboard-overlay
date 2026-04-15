@@ -14,7 +14,7 @@ from gopro_overlay.ffmpeg import FFMPEG
 from gopro_overlay.ffmpeg_gopro import FFMPEGGoPro
 from gopro_overlay.ffmpeg_overlay import FFMPEGOverlay, FFMPEGOptions, FFMPEGOverlayVideo
 from gopro_overlay.timeunits import timeunits
-from tests.test_timeseries import datetime_of
+from test_timeseries import datetime_of
 
 ffprobe_output = (Path(__file__).parent / "test_ffmpeg_ffprobe_output.json").read_text()
 
@@ -98,7 +98,7 @@ def test_parsing_stream_information():
 
     exe = FFMPEG(invoke_fn=fake_invoke(
         Invocation(
-            args=["ffprobe", "-hide_banner", "-print_format", "json", "-show_streams", "whatever"],
+            args=["ffprobe", "-hide_banner", "-print_format", "json", "-show_streams", "-show_format", "whatever"],
             stdout=ffprobe_output
         ),
         Invocation(
@@ -138,13 +138,16 @@ def test_parsing_stream_information():
 
     assert streams.file.length == 9876
 
+    import datetime
+    assert streams.creation_time == datetime.datetime(2021, 9, 17, 9, 35, 17, tzinfo=datetime.timezone.utc)
+
 def test_parsing_stream_information_from_dji():
     def stat(file):
         return stat_result([000, 1234, 123, 1, 1000, 1000, 9876, 10, 20, 30])
 
     exe = FFMPEG(invoke_fn=fake_invoke(
         Invocation(
-            args=["ffprobe", "-hide_banner", "-print_format", "json", "-show_streams", "whatever"],
+            args=["ffprobe", "-hide_banner", "-print_format", "json", "-show_streams", "-show_format", "whatever"],
             stdout=ffprobe_output_dji
         ),
     ))

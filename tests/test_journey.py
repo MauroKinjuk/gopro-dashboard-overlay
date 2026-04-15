@@ -2,7 +2,7 @@ from gopro_overlay.entry import Entry
 from gopro_overlay.gpmf import GPSFix
 from gopro_overlay.journey import Journey
 from gopro_overlay.point import Point, Coordinate, BoundingBox
-from tests.test_timeseries import datetime_of
+from test_timeseries import datetime_of
 
 
 def test_calculating_bounding_box():
