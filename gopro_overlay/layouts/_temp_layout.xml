@@ -1,4 +1,3 @@
-<?xml version='1.0' encoding='utf-8'?>
 <layout>
     -- FC, KMH, Cadencia, Deg --
     <translate x="100" y="120">
@@ -25,7 +24,7 @@
         <translate x="0" y="1400">
             -- Barra --
             <translate x="0" y="150">
-              <component type="bar" metric="speed" units="km/h" width="480" height="75" min="0" max="52" outline="13,109,250,90" bar="235,24,0,100" h-pos="13,109,250" fill="66,73,73,85" />
+              <component type="bar" metric="speed" units="km/h" width="480" height="75" min="0" max="45" outline="13,109,250,90" bar="235,24,0,100" h-pos="13,109,250" fill="66,73,73,85" />
             </translate>
             -- Numero --
             <translate x="250" y="140">
@@ -43,7 +42,7 @@
         <translate x="0" y="1500">
             -- Barra --
             <translate x="0" y="150">
-              <component type="bar" metric="cadence" width="480" height="75" min="0" max="120" outline="13,109,250,90" bar="235,24,0,100" h-pos="13,109,250" fill="66,73,73,85" />
+              <component type="bar" metric="cadence" width="480" height="75" min="0" max="130" outline="13,109,250,90" bar="235,24,0,100" h-pos="13,109,250" fill="66,73,73,85" />
             </translate>
             -- Numero --
             <translate x="250" y="140">
@@ -79,22 +78,19 @@
     -- Distancia y Tiempo --
     <translate x="1920" y="0">
         -- Tiempo --
-        <!-- <translate x="-1200" y="80">
-          <component type="datetime" format="%H:%M:%S" size="55" />
-        </translate> -->
         <translate x="-1200" y="80">
-          <component type="elapsed" size="65" align="centre" />
+          <component type="datetime" format="%H:%M:%S" size="55" />
         </translate>
         -- Barra --
         <translate x="-1000" y="80">
-          <component type="bar" metric="odo" units="km" width="2000" height="75" min="0" max="61" outline="13,109,250,90" bar="235,24,0,100" h-pos="13,109,250" fill="66,73,73,85" />
+          <component type="bar" metric="odo" units="km" width="2000" height="75" min="0" max="30" outline="13,109,250,90" bar="235,24,0,100" h-pos="13,109,250" fill="66,73,73,85" />
         </translate>
         -- Numero --
         <translate x="830" y="75">
           <component type="metric" metric="odo" units="km" dp="1" size="65" align="right" />
         </translate>
       <translate x="830" y="80">
-          <component type="text" size="55" rgb="125,125,125"> / 61</component>
+          <component type="text" size="55" rgb="125,125,125"> / 29.6</component>
         </translate>
         -- Icono --
         <component type="icon" x="680" y="90" file="ruler.png" size="45" />
@@ -103,5 +99,23 @@
     -- Mapa --
     <translate x="3000" y="50">
       <component type="cairo_circuit_map" size="800" fill="228,228,228" outline="0,0,0,80" loc-fill="255,255,255" loc-size="0.02" rotate="0" />
+    </translate>
+
+    -- Altitud --
+    
+
+    <composite name="metrics" x="300" y="1800">
+            
+            -- Altitud --
+            
+        </composite>
+    <translate x="1920" y="1080">
+      <component type="icon" file="faq.png" size="55" x="1654" y="1138" />
+    </translate>
+    <translate x="1596" y="878">
+      <component type="bar" width="300" height="40" metric="dist" />
+    </translate>
+    <translate x="1920" y="1080">
+      <component type="zone-bar" width="300" height="40" metric="speed" zero="255,255,255" h-pos="255,255,255" />
     </translate>
 </layout>
