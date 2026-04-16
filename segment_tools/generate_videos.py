@@ -118,22 +118,56 @@ class LeaderboardVideoGenerator:
 
     def __init__(self, output_dir: Path, duration: float = 12.0, fps: int = 60,
                  width: int = 650, height: int = 550, font_path: Path = None):
+        self.base_width  = 650
+        self.base_height = 550
         self.output_dir  = output_dir
         self.duration    = duration
         self.fps         = fps
         self.width       = width
         self.height      = height
         self.total_frames = int(duration * fps)
+        self.scale_x     = self.width / self.base_width
+        self.scale_y     = self.height / self.base_height
+        self.scale       = min(self.scale_x, self.scale_y)
         self._init_font(font_path)
+        self._init_layout()
 
-        # Columnas (calculadas a partir del margen)
-        m = 20
-        self.margin      = m
-        self.col_rank_x  = m + 12
-        self.col_name_x  = m + 58
-        self.col_date_x  = m + 278
-        self.col_speed_x = m + 420
-        self.col_time_x  = m + 510
+    def px(self, value: float, min_px: int = 1) -> int:
+        return max(min_px, int(round(value)))
+
+    def sx(self, value: float, min_px: int = 1) -> int:
+        return self.px(value * self.scale_x, min_px=min_px)
+
+    def sy(self, value: float, min_px: int = 1) -> int:
+        return self.px(value * self.scale_y, min_px=min_px)
+
+    def ss(self, value: float, min_px: int = 1) -> int:
+        return self.px(value * self.scale, min_px=min_px)
+
+    def _init_layout(self):
+        # Layout basado en el diseño 650x550 y escalado proporcional.
+        self.margin = self.sx(20)
+
+        self.col_rank_x  = self.margin + self.sx(12)
+        self.col_name_x  = self.margin + self.sx(58)
+        self.col_date_x  = self.margin + self.sx(278)
+        self.col_speed_x = self.margin + self.sx(420)
+        self.col_time_x  = self.margin + self.sx(510)
+
+        self.header_h         = self.sy(50)
+        self.col_header_h     = self.sy(26)
+        self.row_h            = self.sy(38)
+        self.panel_top_gap    = self.sy(10)
+        self.panel_bottom_pad = self.sy(15)
+        self.extra_gap        = self.sy(5)
+        self.extra_sep_h      = self.sy(18)
+        self.extra_bottom_pad = self.sy(8)
+
+        self.panel_radius = self.ss(12)
+        self.panel_border = self.ss(2)
+        self.shadow_dx    = self.ss(8)
+        self.shadow_dy    = self.ss(8)
+        self.shadow_blur  = self.ss(14)
 
     def _init_font(self, font_path: Path = None):
         candidates = []
@@ -204,24 +238,23 @@ class LeaderboardVideoGenerator:
         my_pos = segment.get('my_position')
         n_rows = min(len(leaderboard), 10)
 
-        hh = 50  # header height
-        col_header_h = 26
-        row_h = 38
-
         outside_top10 = my_pos is not None and int(my_pos) > 10
 
         # Altura base
-        panel_height = hh + 10 + col_header_h + (n_rows * row_h) + 15
+        panel_height = (
+            self.header_h
+            + self.panel_top_gap
+            + self.col_header_h
+            + (n_rows * self.row_h)
+            + self.panel_bottom_pad
+        )
         if outside_top10:
-            panel_height += 5 + 18 + row_h + 8  # fila extra
+            panel_height += self.extra_gap + self.extra_sep_h + self.row_h + self.extra_bottom_pad
 
-        # Calcular offset si excede altura disponible
+        # Centrar el panel verticalmente: mantiene composición alineada en 4k/1080/short.
         default_panel_h = self.height - 2 * self.margin
-        dy_offset = 0
-        if panel_height > default_panel_h:
-            dy_offset = (panel_height - default_panel_h) // 2
-
-        return panel_height, -dy_offset
+        dy_offset = (default_panel_h - panel_height) // 2
+        return panel_height, dy_offset
 
     def draw_panel(self, img: Image.Image, draw: ImageDraw.Draw,
                    alpha: float = 1.0, dy: int = 0, panel_height: int = None):
@@ -236,44 +269,47 @@ class LeaderboardVideoGenerator:
         if alpha > 0.25:
             sh = Image.new('RGBA', img.size, (0, 0, 0, 0))
             sd = ImageDraw.Draw(sh)
-            sd.rounded_rectangle([(x1 + 8, y1 + 8), (x2 + 8, y2 + 8)],
-                                  radius=14, fill=(0, 0, 0, int(75 * alpha)))
-            sh = sh.filter(ImageFilter.GaussianBlur(14))
+            sd.rounded_rectangle(
+                [(x1 + self.shadow_dx, y1 + self.shadow_dy), (x2 + self.shadow_dx, y2 + self.shadow_dy)],
+                radius=self.ss(14),
+                fill=(0, 0, 0, int(75 * alpha)),
+            )
+            sh = sh.filter(ImageFilter.GaussianBlur(self.shadow_blur))
             img.alpha_composite(sh)
 
-        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=12,
+        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=self.panel_radius,
                                 fill=with_alpha(self.BG, alpha))
-        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=12,
-                                outline=with_alpha(self.PANEL_BORDER, alpha), width=2)
+        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=self.panel_radius,
+                                outline=with_alpha(self.PANEL_BORDER, alpha), width=self.panel_border)
         return x1, y1, x2, y2, pw, ph
 
     def draw_header(self, draw: ImageDraw.Draw, segment: Dict,
                     x1, y1, pw, alpha: float = 1.0) -> int:
         """Dibuja el header naranja. Retorna la altura del header."""
-        hh = 50
+        hh = self.header_h
         draw.rounded_rectangle([(x1, y1), (x1 + pw, y1 + hh)],
-                                radius=12, fill=with_alpha(self.HEADER, alpha))
+                                radius=self.panel_radius, fill=with_alpha(self.HEADER, alpha))
         # Franja de acento superior
-        draw.rectangle([(x1, y1 + 2), (x1 + pw, y1 + 12)],
+        draw.rectangle([(x1, y1 + self.sy(2)), (x1 + pw, y1 + self.sy(12))],
                         fill=with_alpha(self.HEADER_TOP, alpha))
         # Reaplicar bordes redondeados superiores (el rectangle los tapa)
         draw.rounded_rectangle([(x1, y1), (x1 + pw, y1 + hh)],
-                                radius=12, outline=None)
+                                radius=self.panel_radius, outline=None)
 
         # Ícono ⚡
-        draw.text((x1 + 11, y1 + 14), "⚡", font=self.font(17),
+        draw.text((x1 + self.sx(11), y1 + self.sy(14)), "⚡", font=self.font(self.ss(17)),
                   fill=with_alpha(self.TEXT, alpha))
 
         # Nombre del segmento
         name = segment.get('name', 'Segmento')
-        f = self.font(21 if len(name) < 28 else 17)
-        name = self.truncate(draw, name, f, pw - 80)
-        self.shadow_text(draw, (x1 + 36, y1 + 13), name, f,
+        f = self.font(self.ss(21) if len(name) < 28 else self.ss(17))
+        name = self.truncate(draw, name, f, pw - self.sx(80))
+        self.shadow_text(draw, (x1 + self.sx(36), y1 + self.sy(13)), name, f,
                          with_alpha(self.TEXT, alpha))
         return hh
 
     def draw_col_headers(self, draw: ImageDraw.Draw, y: int, alpha: float = 1.0):
-        f = self.font(13)
+        f = self.font(self.ss(13))
         c = with_alpha(self.DIM, alpha)
         draw.text((self.col_rank_x,  y), "N°",     font=f, fill=c)
         draw.text((self.col_name_x,  y), "Nombre", font=f, fill=c)
@@ -289,21 +325,30 @@ class LeaderboardVideoGenerator:
                               glow: bool = False, glow_color: tuple = None):
         """Dibuja una sola fila del leaderboard."""
         if glow and glow_color:
-            self.glow_rect(img, x1 + 5, row_y, x1 + pw - 5,
-                           row_y + row_h - 3, glow_color, blur=12)
+            self.glow_rect(
+                img,
+                x1 + self.sx(5),
+                row_y,
+                x1 + pw - self.sx(5),
+                row_y + row_h - self.sy(3),
+                glow_color,
+                blur=self.ss(12),
+            )
             draw = ImageDraw.Draw(img)
 
-        rx1 = x1 + 5 + slide_x
-        draw.rectangle([(rx1, row_y), (x1 + pw - 5, row_y + row_h - 3)],
+        rx1 = x1 + self.sx(5) + slide_x
+        draw.rectangle([(rx1, row_y), (x1 + pw - self.sx(5), row_y + row_h - self.sy(3))],
                         fill=with_alpha(bg, alpha))
 
-        f = self.font(16)
-        ty = row_y + 10
+        f = self.font(self.ss(16))
+        ty = row_y + self.sy(10)
         ox = slide_x  # offset horizontal para texto
 
         rank = int(entry.get('rank', 0))
+        name_max_w = max(self.sx(40), self.col_date_x - (self.col_name_x + ox) - self.sx(10))
+        name_txt = self.truncate(draw, entry.get('name', ''), f, name_max_w)
         draw.text((self.col_rank_x  + ox, ty), str(rank),                   font=f, fill=with_alpha(rank_c, alpha))
-        draw.text((self.col_name_x  + ox, ty), entry.get('name', '')[:20],  font=f, fill=with_alpha(text_c, alpha))
+        draw.text((self.col_name_x  + ox, ty), name_txt,                    font=f, fill=with_alpha(text_c, alpha))
         draw.text((self.col_date_x  + ox, ty), entry.get('date', ''),       font=f, fill=with_alpha(self.DIM, alpha))
         draw.text((self.col_speed_x + ox, ty), str(entry.get('speed_kmh', '')), font=f, fill=with_alpha(text_c, alpha))
         draw.text((self.col_time_x  + ox, ty), entry.get('time', ''),       font=f, fill=with_alpha(text_c, alpha))
@@ -332,44 +377,44 @@ class LeaderboardVideoGenerator:
         y2 = y1 + ph
 
         # Fondo + borde
-        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=14,
+        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=self.ss(14),
                                 fill=with_alpha(self.BG, alpha))
-        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=14,
-                                outline=with_alpha(self.PANEL_BORDER, alpha), width=2)
+        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=self.ss(14),
+                                outline=with_alpha(self.PANEL_BORDER, alpha), width=self.panel_border)
 
         # Header
-        hh = 48
+        hh = self.sy(48)
         draw.rounded_rectangle([(x1, y1), (x2, y1 + hh)],
-                                radius=12, fill=with_alpha(self.HEADER, alpha))
+                                radius=self.panel_radius, fill=with_alpha(self.HEADER, alpha))
 
         sub = "PRÓXIMO SEGMENTO"
-        fs  = self.font(13)
+        fs  = self.font(self.ss(13))
         bx  = draw.textbbox((0, 0), sub, font=fs)
         sw  = bx[2] - bx[0]
-        draw.text((x1 + (pw - sw) // 2, y1 + 15), sub, font=fs,
+        draw.text((x1 + (pw - sw) // 2, y1 + self.sy(15)), sub, font=fs,
                   fill=with_alpha(self.TEXT, alpha))
 
         # Nombre con fade tardío
         name_t = ease_out_cubic(clamp((t - 0.28) / 0.72))
         if name_t > 0.01:
             name = segment.get('name', 'Segmento')
-            fn   = self.font(28 if len(name) < 22 else 22)
-            name = self.truncate(draw, name, fn, pw - 60)
+            fn   = self.font(self.ss(28) if len(name) < 22 else self.ss(22))
+            name = self.truncate(draw, name, fn, pw - self.sx(60))
             bx   = draw.textbbox((0, 0), name, font=fn)
             nw   = bx[2] - bx[0]
             nx   = x1 + (pw - nw) // 2
-            ny   = y1 + hh + 20
+            ny   = y1 + hh + self.sy(20)
             self.shadow_text(draw, (nx, ny), name, fn,
-                             with_alpha(self.HIGHLIGHT, name_t), off=3)
+                             with_alpha(self.HIGHLIGHT, name_t), off=self.ss(3))
 
         # Flecha con bounce tardío
         arrow_t = ease_out_bounce(clamp((t - 0.65) / 0.35))
         if arrow_t > 0.01:
-            fa   = self.font(13)
+            fa   = self.font(self.ss(13))
             atxt = "▼  Leaderboard  ▼"
             bx   = draw.textbbox((0, 0), atxt, font=fa)
             aw   = bx[2] - bx[0]
-            ay   = y2 - 28 + int((1 - arrow_t) * 16)
+            ay   = y2 - self.sy(28) + int((1 - arrow_t) * self.sy(16))
             draw.text((x1 + (pw - aw) // 2, ay), atxt, font=fa,
                       fill=with_alpha(self.DIM, arrow_t * alpha))
 
@@ -381,8 +426,8 @@ class LeaderboardVideoGenerator:
         """
         leaderboard = segment.get('leaderboard', [])
         n_rows      = min(len(leaderboard), 10)
-        row_h       = 38
-        col_header_h = 26
+        row_h       = self.row_h
+        col_header_h = self.col_header_h
 
         # Calcular layout del panel
         panel_height, dy_offset = self._calc_panel_layout(segment)
@@ -393,7 +438,7 @@ class LeaderboardVideoGenerator:
         x1, y1, x2, y2, pw, ph = self.draw_panel(img, draw, panel_height=panel_height, dy=dy_offset)
         hh = self.draw_header(draw, segment, x1, y1, pw)
 
-        col_y    = y1 + hh + 10
+        col_y    = y1 + hh + self.panel_top_gap
         row_st_y = col_y + col_header_h
 
         # Headers de columna con fade in rápido
@@ -412,7 +457,7 @@ class LeaderboardVideoGenerator:
                 continue
 
             ry      = row_st_y + i * row_h
-            slide_x = int((1 - row_t) * -65)
+            slide_x = int((1 - row_t) * -self.sx(65))
             row_bg  = self.ROW_ODD if i % 2 == 0 else self.ROW_EVEN
 
             self.draw_leaderboard_row(
@@ -458,9 +503,9 @@ class LeaderboardVideoGenerator:
         x1, y1, x2, y2, pw, ph = self.draw_panel(img, draw, panel_height=panel_height, dy=dy_offset)
         hh = self.draw_header(draw, segment, x1, y1, pw)
 
-        col_y    = y1 + hh + 10
-        row_h    = 38
-        row_st_y = col_y + 26
+        col_y    = y1 + hh + self.panel_top_gap
+        row_h    = self.row_h
+        row_st_y = col_y + self.col_header_h
 
         self.draw_col_headers(draw, col_y)
 
@@ -540,14 +585,14 @@ class LeaderboardVideoGenerator:
         # ── Mi fila fuera del top 10 ──
         if outside_top10 and t >= appear_start:
             appear_t   = ease_out_bounce(clamp((t - appear_start) / (appear_end - appear_start)))
-            sep_y      = row_st_y + n_rows * row_h + 5
-            my_row_y   = sep_y + 18
-            slide_yd   = int((1 - appear_t) * 45)  # sube desde abajo
+            sep_y      = row_st_y + n_rows * row_h + self.extra_gap
+            my_row_y   = sep_y + self.extra_sep_h
+            slide_yd   = int((1 - appear_t) * self.sy(45))  # sube desde abajo
 
             # Separador "· · ·"
             sep_alpha = ease_out_cubic(clamp((t - appear_start) / 0.15))
             if sep_alpha > 0.01:
-                fs   = self.font(12)
+                fs   = self.font(self.ss(12))
                 stxt = "· · · · · · · · · · · · · · · · ·"
                 bx   = draw.textbbox((0, 0), stxt, font=fs)
                 sw   = bx[2] - bx[0]
@@ -558,23 +603,23 @@ class LeaderboardVideoGenerator:
             if appear_t > 0.4:
                 ga = 0.4 + 0.5 * pulse
                 self.glow_rect(img,
-                               x1 + 5, my_row_y + slide_yd,
-                               x1 + pw - 5, my_row_y + row_h - 3 + slide_yd,
-                               with_alpha(self.HIGHLIGHT_GLOW, ga), blur=14)
+                               x1 + self.sx(5), my_row_y + slide_yd,
+                               x1 + pw - self.sx(5), my_row_y + row_h - self.sy(3) + slide_yd,
+                               with_alpha(self.HIGHLIGHT_GLOW, ga), blur=self.ss(14))
                 draw = ImageDraw.Draw(img)
 
             # Fondo
             my_bg = lerp_color(self.MY_ROW, self.MY_ROW_PULSE, pulse * appear_t)
             draw.rectangle(
-                [(x1 + 5, my_row_y + slide_yd),
-                 (x1 + pw - 5, my_row_y + row_h - 3 + slide_yd)],
+                [(x1 + self.sx(5), my_row_y + slide_yd),
+                 (x1 + pw - self.sx(5), my_row_y + row_h - self.sy(3) + slide_yd)],
                 fill=my_bg,
             )
 
             # Texto
-            fn  = self.font(16)
+            fn  = self.font(self.ss(16))
             hl  = self.HIGHLIGHT
-            ty  = my_row_y + 10 + slide_yd
+            ty  = my_row_y + self.sy(10) + slide_yd
             draw.text((self.col_rank_x,  ty), str(my_pos),                           font=fn, fill=hl)
             draw.text((self.col_name_x,  ty), "Mauro en Bici",                                  font=fn, fill=hl)
             draw.text((self.col_speed_x, ty), str(segment.get('my_speed', '')),      font=fn, fill=hl)
@@ -593,7 +638,7 @@ class LeaderboardVideoGenerator:
 
         ease_t   = ease_in_cubic(t)
         alpha    = 1.0 - ease_t
-        slide_y  = int(ease_t * -55)
+        slide_y  = int(ease_t * -self.sy(55))
         shrink   = ease_t * 0.12
 
         m  = self.margin
@@ -604,23 +649,23 @@ class LeaderboardVideoGenerator:
         x2 = m + pw
         y2 = y1 + ph
 
-        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=12,
+        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=self.panel_radius,
                                 fill=with_alpha(self.BG, alpha))
 
-        fn   = self.font(22)
+        fn   = self.font(self.ss(22))
         name = segment.get('name', '')[:35]
         bx   = draw.textbbox((0, 0), name, font=fn)
         nw   = bx[2] - bx[0]
         nx   = x1 + (pw - nw) // 2
-        ny   = y1 + ph // 2 - 22
+        ny   = y1 + ph // 2 - self.sy(22)
         self.shadow_text(draw, (nx, ny), name, fn,
                          with_alpha(self.HIGHLIGHT, alpha))
 
-        fm   = self.font(14)
+        fm   = self.font(self.ss(14))
         msg  = "¡Segmento completado!"
         bx   = draw.textbbox((0, 0), msg, font=fm)
         mw   = bx[2] - bx[0]
-        draw.text((x1 + (pw - mw) // 2, ny + 38), msg, font=fm,
+        draw.text((x1 + (pw - mw) // 2, ny + self.sy(38)), msg, font=fm,
                   fill=with_alpha(self.DIM, alpha))
 
         return img
@@ -795,6 +840,9 @@ def main():
     parser.add_argument("--fps",         type=int,   default=60)
     parser.add_argument("--width",       type=int,   default=650)
     parser.add_argument("--height",      type=int,   default=550)
+    parser.add_argument("--preset",      type=str,   default=None,
+                        choices=["4k", "1080", "short"],
+                        help="Preset de salida: 4k=3840x2160, 1080=1920x1080, short=1080x1920")
     parser.add_argument("--font",        type=Path,  default=None)
     parser.add_argument("--filter",      type=str,   default=None,
                         help="Filtrar segmentos por nombre (substring)")
@@ -805,6 +853,13 @@ def main():
     if not args.segments.exists():
         log(f"Archivo no encontrado: {args.segments}")
         sys.exit(1)
+
+    if args.preset == "4k":
+        args.width, args.height = 3840, 2160
+    elif args.preset == "1080":
+        args.width, args.height = 1920, 1080
+    elif args.preset == "short":
+        args.width, args.height = 1080, 1920
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -833,6 +888,7 @@ def main():
         height=args.height,
         font_path=args.font,
     )
+    log(f"Salida: {args.width}x{args.height} @ {args.fps}fps")
 
     ok = 0
     for i, seg in enumerate(segments, 1):
