@@ -268,7 +268,8 @@ class LeaderboardVideoGenerator:
             + self.panel_bottom_pad
         )
         if outside_top10:
-            panel_height += self.extra_gap + self.extra_sep_h + self.row_h + self.extra_bottom_pad
+            # Mi fila fuera del top 10 ocupa exactamente una fila adicional, sin separadores extra.
+            panel_height += self.row_h
 
         # Centrar el panel verticalmente: mantiene composición alineada en 4k/1080/short.
         default_panel_h = self.stage_height - 2 * self.margin
@@ -590,19 +591,8 @@ class LeaderboardVideoGenerator:
         # ── Mi fila fuera del top 10 ──
         if outside_top10 and t >= appear_start:
             appear_t   = ease_out_bounce(clamp((t - appear_start) / (appear_end - appear_start)))
-            sep_y      = row_st_y + n_rows * row_h + self.extra_gap
-            my_row_y   = sep_y + self.extra_sep_h
+            my_row_y   = row_st_y + n_rows * row_h
             slide_yd   = int((1 - appear_t) * self.sy(45))  # sube desde abajo
-
-            # Separador "· · ·"
-            sep_alpha = ease_out_cubic(clamp((t - appear_start) / 0.15))
-            if sep_alpha > 0.01:
-                fs   = self.font(self.ss(12))
-                stxt = "· · · · · · · · · · · · · · · · ·"
-                bx   = draw.textbbox((0, 0), stxt, font=fs)
-                sw   = bx[2] - bx[0]
-                draw.text((x1 + (pw - sw) // 2, sep_y), stxt, font=fs,
-                          fill=with_alpha(self.SEPARATOR, sep_alpha))
 
             # Glow
             if appear_t > 0.4:
@@ -639,7 +629,11 @@ class LeaderboardVideoGenerator:
     def frame_closing(self, segment: Dict, t: float) -> Image.Image:
         """Cierre limpio: se mantiene el leaderboard y luego se oculta con fade + slide."""
         base = self.frame_position(segment, 1.0)
-        ease_t = ease_in_cubic(t)
+        hold_ratio = 0.33  # pequeño hold antes de ocultar
+        if t < hold_ratio:
+            ease_t = 0.0
+        else:
+            ease_t = ease_in_cubic(clamp((t - hold_ratio) / (1.0 - hold_ratio)))
         alpha = 1.0 - ease_t
         slide_y = int(ease_t * -self.sy(55))
 
