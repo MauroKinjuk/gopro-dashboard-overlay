@@ -102,9 +102,9 @@ class LeaderboardVideoGenerator:
     PANEL_BORDER   = (255, 100,  0,  160)
     HEADER         = (215,  65,  0,  255)   # Naranja Strava
     HEADER_TOP     = (255, 120, 20,  255)   # Acento superior
-    TEXT           = (240, 240, 240, 255)
-    DIM            = (155, 155, 165, 255)
-    HIGHLIGHT      = (255, 200,   0, 255)   # Amarillo → solo TÚ
+    TEXT           = (255, 255, 255, 255)
+    DIM            = (255, 255, 255, 255)
+    HIGHLIGHT      = (255, 255, 255, 255)
     HIGHLIGHT_GLOW = (255, 160,   0,  90)
     ROW_ODD        = ( 42,  44,  52, 210)
     ROW_EVEN       = ( 32,  34,  41, 210)
@@ -221,9 +221,9 @@ class LeaderboardVideoGenerator:
     # ── Helpers de dibujo ─────────────────────────────────────────────────
 
     def rank_color(self, rank: int) -> tuple:
-        if rank == 1: return self.GOLD
-        if rank == 2: return self.SILVER
-        if rank == 3: return self.BRONZE
+        if rank == 1: return self.TEXT
+        if rank == 2: return self.TEXT
+        if rank == 3: return self.TEXT
         return self.TEXT
 
     def shadow_text(self, draw: ImageDraw.Draw, xy, text, font,
@@ -334,7 +334,8 @@ class LeaderboardVideoGenerator:
                               x1: int, pw: int,
                               bg: tuple, text_c: tuple, rank_c: tuple,
                               alpha: float = 1.0, slide_x: int = 0,
-                              glow: bool = False, glow_color: tuple = None):
+                              glow: bool = False, glow_color: tuple = None,
+                              rank_override: Optional[int] = None):
         """Dibuja una sola fila del leaderboard."""
         if glow and glow_color:
             self.glow_rect(
@@ -356,7 +357,7 @@ class LeaderboardVideoGenerator:
         ty = row_y + self.sy(10)
         ox = slide_x  # offset horizontal para texto
 
-        rank = int(entry.get('rank', 0))
+        rank = int(rank_override if rank_override is not None else entry.get('rank', 0))
         name_max_w = max(self.sx(40), self.col_date_x - (self.col_name_x + ox) - self.sx(10))
         name_txt = self.truncate(draw, entry.get('name', ''), f, name_max_w)
         rank_x = self.col_rank_x + ox
@@ -453,7 +454,7 @@ class LeaderboardVideoGenerator:
 
         for i in range(n_rows):
             entry = leaderboard[i]
-            rank  = int(entry.get('rank', i + 1))
+            rank  = i + 1
 
             # Cada fila empieza en t = i/(n_rows * 1.1)
             start_t = i / (n_rows * 1.1)
@@ -473,6 +474,7 @@ class LeaderboardVideoGenerator:
                 rank_c=self.rank_color(rank),
                 alpha=row_t,
                 slide_x=slide_x,
+                rank_override=rank,
             )
             # Re-obtener draw después de posibles composites
             draw = ImageDraw.Draw(img)
@@ -543,7 +545,7 @@ class LeaderboardVideoGenerator:
         # ── Dibujar las 10 filas del top ──
         for i in range(n_rows):
             entry = leaderboard[i]
-            rank  = int(entry.get('rank', i + 1))
+            rank  = i + 1
             ry    = row_st_y + i * row_h
 
             # Distancia al cursor de scan
@@ -558,6 +560,7 @@ class LeaderboardVideoGenerator:
                     img, draw, entry, ry, row_h, x1, pw,
                     bg=pulse_bg, text_c=self.HIGHLIGHT, rank_c=self.HIGHLIGHT,
                     glow=True, glow_color=with_alpha(self.HIGHLIGHT_GLOW, 0.6 + 0.4 * pulse),
+                    rank_override=rank,
                 )
             elif is_scan:
                 scan_intensity = 1 - dist_to_scan / 0.75
@@ -569,6 +572,7 @@ class LeaderboardVideoGenerator:
                 self.draw_leaderboard_row(
                     img, draw, entry, ry, row_h, x1, pw,
                     bg=bg, text_c=self.TEXT, rank_c=self.rank_color(rank),
+                    rank_override=rank,
                 )
             else:
                 # Fila en reposo
@@ -578,12 +582,14 @@ class LeaderboardVideoGenerator:
                     self.draw_leaderboard_row(
                         img, draw, entry, ry, row_h, x1, pw,
                         bg=bg, text_c=self.HIGHLIGHT, rank_c=self.HIGHLIGHT,
+                        rank_override=rank,
                     )
                 else:
                     bg = self.ROW_ODD if i % 2 == 0 else self.ROW_EVEN
                     self.draw_leaderboard_row(
                         img, draw, entry, ry, row_h, x1, pw,
                         bg=bg, text_c=self.TEXT, rank_c=self.rank_color(rank),
+                        rank_override=rank,
                     )
 
             draw = ImageDraw.Draw(img)
@@ -616,9 +622,10 @@ class LeaderboardVideoGenerator:
             hl  = self.HIGHLIGHT
             ty  = my_row_y + self.sy(10) + slide_yd
             draw.text((self.col_rank_x,  ty), str(my_pos),                           font=fn, fill=hl)
-            draw.text((self.col_name_x,  ty), "Mauro en Bici",                                  font=fn, fill=hl)
-            draw.text((self.col_speed_x, ty), str(segment.get('my_speed', '')),      font=fn, fill=hl)
-            draw.text((self.col_time_x,  ty), str(segment.get('my_time',  '')),      font=fn, fill=hl)
+            draw.text((self.col_name_x,  ty), str(segment.get('my_name') or "Mauro en Bici"), font=fn, fill=hl)
+            draw.text((self.col_date_x,  ty), str(segment.get('my_date') or ""),     font=fn, fill=hl)
+            draw.text((self.col_speed_x, ty), str(segment.get('my_speed') or ""),    font=fn, fill=hl)
+            draw.text((self.col_time_x,  ty), str(segment.get('my_time') or ""),     font=fn, fill=hl)
 
         return img
 
@@ -744,6 +751,8 @@ def load_from_csv(csv_file: Path) -> List[Dict]:
                     'name':        row['SegmentName'].strip(),
                     'leaderboard': [],
                     'my_position': None,
+                    'my_name':     None,
+                    'my_date':     None,
                     'my_time':     None,
                     'my_speed':    None,
                 }
@@ -761,6 +770,8 @@ def load_from_csv(csv_file: Path) -> List[Dict]:
             if is_me:
                 s = segments_map[seg_id]
                 s['my_position'] = int(row['Rank'].strip())
+                s['my_name']     = row['Nombre'].strip()
+                s['my_date']     = row['Fecha'].strip()
                 s['my_time']     = row['Segundos'].strip()
                 s['my_speed']    = row['KM/H'].strip()
                 # NO se agrega al leaderboard (se muestra separado si > 10)
@@ -796,17 +807,60 @@ def load_from_json(json_file: Path) -> List[Dict]:
             log(f"  ⚠ Sin leaderboard para '{seg['name']}', usando datos de ejemplo")
             lb          = create_sample_leaderboard(seg['name'])
             my_position = 7
+            my_name     = "Mauro en Bici"
+            my_date     = "15/04/26"
             my_time     = "2:45"
             my_speed    = "28.5"
         else:
             my_position = seg.get('my_position')
+            my_name     = seg.get('my_name')
+            my_date     = seg.get('my_date')
             my_time     = seg.get('my_time')
             my_speed    = seg.get('my_speed')
+
+            # Fallback: si my_* no viene en raíz, intentar inferir desde leaderboard.
+            target_names = [my_name, "Mauro Kinjuk", "Mauro en Bici"]
+            target_names = [n.strip().lower() for n in target_names if isinstance(n, str) and n.strip()]
+
+            def _to_int(v):
+                try:
+                    return int(v)
+                except Exception:
+                    return None
+
+            me_row = None
+            if target_names:
+                for e in lb:
+                    nm = str(e.get('name', '')).strip().lower()
+                    if nm in target_names:
+                        me_row = e
+                        break
+            if me_row is None and my_position is not None:
+                pos_int = _to_int(my_position)
+                if pos_int is not None:
+                    for e in lb:
+                        if _to_int(e.get('rank')) == pos_int:
+                            me_row = e
+                            break
+
+            if me_row is not None:
+                if my_position is None:
+                    my_position = _to_int(me_row.get('rank'))
+                if not my_name:
+                    my_name = me_row.get('name')
+                if not my_date:
+                    my_date = me_row.get('date')
+                if not my_time:
+                    my_time = me_row.get('time')
+                if not my_speed:
+                    my_speed = me_row.get('speed_kmh')
         segments.append({
             'id':          seg['id'],
             'name':        seg['name'],
             'leaderboard': lb,
             'my_position': my_position,
+            'my_name':     my_name,
+            'my_date':     my_date,
             'my_time':     my_time,
             'my_speed':    my_speed,
         })
