@@ -111,6 +111,7 @@ class LeaderboardVideoGenerator:
     SCAN_ROW       = ( 60,  55,  28, 235)
     MY_ROW         = ( 68,  52,   8, 245)
     MY_ROW_PULSE   = (120,  95,  15, 250)
+    COL_HEADER_BG  = ( 52,  54,  62, 175)
     SEPARATOR      = (255, 100,   0, 110)
     GOLD           = (255, 200,  50, 255)
     SILVER         = (200, 200, 210, 255)
@@ -271,22 +272,7 @@ class LeaderboardVideoGenerator:
         x1, y1 = self.stage_x + m, self.stage_y + m + dy
         x2, y2 = x1 + pw, y1 + ph
 
-        # Sombra exterior
-        if alpha > 0.25:
-            sh = Image.new('RGBA', img.size, (0, 0, 0, 0))
-            sd = ImageDraw.Draw(sh)
-            sd.rounded_rectangle(
-                [(x1 + self.shadow_dx, y1 + self.shadow_dy), (x2 + self.shadow_dx, y2 + self.shadow_dy)],
-                radius=self.ss(14),
-                fill=(0, 0, 0, int(75 * alpha)),
-            )
-            sh = sh.filter(ImageFilter.GaussianBlur(self.shadow_blur))
-            img.alpha_composite(sh)
-
-        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=self.panel_radius,
-                                fill=with_alpha(self.BG, alpha))
-        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=self.panel_radius,
-                                outline=with_alpha(self.PANEL_BORDER, alpha), width=self.panel_border)
+        # Panel completamente transparente/sin borde.
         return x1, y1, x2, y2, pw, ph
 
     def draw_header(self, draw: ImageDraw.Draw, segment: Dict,
@@ -318,7 +304,14 @@ class LeaderboardVideoGenerator:
                          with_alpha(self.TEXT, alpha))
         return hh
 
-    def draw_col_headers(self, draw: ImageDraw.Draw, y: int, alpha: float = 1.0):
+    def draw_col_headers(self, draw: ImageDraw.Draw, x1: int, pw: int, y: int, alpha: float = 1.0):
+        bar_y1 = y - self.sy(4)
+        bar_y2 = y + self.sy(20)
+        draw.rounded_rectangle(
+            [(x1 + self.sx(5), bar_y1), (x1 + pw - self.sx(5), bar_y2)],
+            radius=self.ss(8),
+            fill=with_alpha(self.COL_HEADER_BG, alpha),
+        )
         f = self.font(self.ss(13))
         c = with_alpha(self.DIM, alpha)
         draw.text((self.col_rank_x,  y), "N°",     font=f, fill=c)
@@ -453,7 +446,7 @@ class LeaderboardVideoGenerator:
 
         # Headers de columna con fade in rápido
         col_alpha = ease_out_cubic(clamp(t * 5))
-        self.draw_col_headers(draw, col_y, alpha=col_alpha)
+        self.draw_col_headers(draw, x1, pw, col_y, alpha=col_alpha)
 
         for i in range(n_rows):
             entry = leaderboard[i]
@@ -517,7 +510,7 @@ class LeaderboardVideoGenerator:
         row_h    = self.row_h
         row_st_y = col_y + self.col_header_h
 
-        self.draw_col_headers(draw, col_y)
+        self.draw_col_headers(draw, x1, pw, col_y)
 
         # ── Timing de sub-fases ──
         if my_pos is not None and int(my_pos) > 10:
