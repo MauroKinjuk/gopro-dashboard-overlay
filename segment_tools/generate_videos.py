@@ -198,12 +198,37 @@ class LeaderboardVideoGenerator:
 
     # ── Panel base ────────────────────────────────────────────────────────
 
+    def _calc_panel_layout(self, segment: Dict) -> tuple:
+        """Calcula altura del panel y offset cuando hay fila extra fuera del top 10."""
+        leaderboard = segment.get('leaderboard', [])
+        my_pos = segment.get('my_position')
+        n_rows = min(len(leaderboard), 10)
+
+        hh = 50  # header height
+        col_header_h = 26
+        row_h = 38
+
+        outside_top10 = my_pos is not None and int(my_pos) > 10
+
+        # Altura base
+        panel_height = hh + 10 + col_header_h + (n_rows * row_h) + 15
+        if outside_top10:
+            panel_height += 5 + 18 + row_h + 8  # fila extra
+
+        # Calcular offset si excede altura disponible
+        default_panel_h = self.height - 2 * self.margin
+        dy_offset = 0
+        if panel_height > default_panel_h:
+            dy_offset = (panel_height - default_panel_h) // 2
+
+        return panel_height, -dy_offset
+
     def draw_panel(self, img: Image.Image, draw: ImageDraw.Draw,
-                   alpha: float = 1.0, dy: int = 0):
+                   alpha: float = 1.0, dy: int = 0, panel_height: int = None):
         """Dibuja fondo + borde del panel. Retorna (x1,y1,x2,y2,panel_w,panel_h)."""
         m = self.margin
         pw = self.width - 2 * m
-        ph = self.height - 2 * m
+        ph = panel_height if panel_height is not None else (self.height - 2 * m)
         x1, y1 = m, m + dy
         x2, y2 = m + pw, m + ph + dy
 
@@ -349,28 +374,27 @@ class LeaderboardVideoGenerator:
                       fill=with_alpha(self.DIM, arrow_t * alpha))
 
         return img
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # FASE 2 — Building (tabla apareciendo fila por fila)
-    # ══════════════════════════════════════════════════════════════════════════
-
     def frame_building(self, segment: Dict, t: float) -> Image.Image:
         """
         Cada fila tiene su propio timing staggered.
         Aparece con slide desde la izquierda + fade.
         """
+        leaderboard = segment.get('leaderboard', [])
+        n_rows      = min(len(leaderboard), 10)
+        row_h       = 38
+        col_header_h = 26
+
+        # Calcular layout del panel
+        panel_height, dy_offset = self._calc_panel_layout(segment)
+
         img  = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        leaderboard = segment.get('leaderboard', [])
-        n_rows      = min(len(leaderboard), 10)
-
-        x1, y1, x2, y2, pw, ph = self.draw_panel(img, draw)
+        x1, y1, x2, y2, pw, ph = self.draw_panel(img, draw, panel_height=panel_height, dy=dy_offset)
         hh = self.draw_header(draw, segment, x1, y1, pw)
 
         col_y    = y1 + hh + 10
-        row_h    = 38
-        row_st_y = col_y + 26
+        row_st_y = col_y + col_header_h
 
         # Headers de columna con fade in rápido
         col_alpha = ease_out_cubic(clamp(t * 5))
@@ -426,8 +450,12 @@ class LeaderboardVideoGenerator:
         leaderboard = segment.get('leaderboard', [])
         my_pos      = segment.get('my_position')   # int o None
         n_rows      = min(len(leaderboard), 10)
+        outside_top10 = my_pos is not None and int(my_pos) > 10
 
-        x1, y1, x2, y2, pw, ph = self.draw_panel(img, draw)
+        # Calcular layout del panel
+        panel_height, dy_offset = self._calc_panel_layout(segment)
+
+        x1, y1, x2, y2, pw, ph = self.draw_panel(img, draw, panel_height=panel_height, dy=dy_offset)
         hh = self.draw_header(draw, segment, x1, y1, pw)
 
         col_y    = y1 + hh + 10
@@ -436,10 +464,8 @@ class LeaderboardVideoGenerator:
 
         self.draw_col_headers(draw, col_y)
 
-        outside_top10 = my_pos is not None and int(my_pos) > 10
-
         # ── Timing de sub-fases ──
-        if outside_top10:
+        if my_pos is not None and int(my_pos) > 10:
             scan_end    = 0.35
             appear_start = 0.35
             appear_end   = 0.58
