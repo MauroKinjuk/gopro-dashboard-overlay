@@ -299,13 +299,60 @@ python setup_strava_auth.py
 python build_segment_overlay_data.py --gpx "ruta/a/MiCarrera.gpx" --activity-url "https://www.strava.com/activities/12345678" --output segments_timed.json
 
 # 2. Generar videos de leaderboard (un video por segmento)
-python bin\generate_segment_videos.py --segments segments_timed.json --output-dir ./segment_videos
+python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_videos
 
 # 2b. Generar solo los primeros N segmentos (ej: solo el primero)
-python bin\generate_segment_videos.py --segments segments_timed.json --output-dir ./segment_videos --limit 1
+python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_videos --limit 1
 
 # 3. Los videos estan en segment_videos/ - importalos en CapCut!
 ```
+
+## Generador de videos por segmento (calidad y formatos)
+
+El script `segment_tools/generate_videos.py` ahora soporta escalado responsive del layout para mantener alineación visual en distintas resoluciones.
+
+### Resoluciones rápidas (presets)
+
+```bash
+# 4K horizontal
+python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_videos --preset 4k
+
+# 1080p horizontal
+python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_videos --preset 1080
+
+# Short vertical (9:16)
+python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_videos --preset short
+```
+
+### Escala del panel dentro del video
+
+Por defecto el leaderboard ocupa el **70%** del encuadre final (centrado).  
+Podés ajustarlo con `--panel-scale` (`0.35` a `1.0`):
+
+```bash
+# 4K con panel al 70% (default)
+python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_videos --preset 4k --panel-scale 0.70
+
+# 1080 con panel más grande
+python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_videos --preset 1080 --panel-scale 0.85
+```
+
+### Preview estático (sin renderizar video completo)
+
+Para ver cómo quedaría el diseño, podés exportar imágenes PNG:
+
+```bash
+# Preview de la fase principal (position)
+python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_previews --preset 4k --panel-scale 0.70 --preview-image --preview-phase position --preview-t 0.82
+
+# Preview de intro
+python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_previews --preset short --preview-image --preview-phase intro --preview-t 0.60
+```
+
+Parámetros de preview:
+- `--preview-image`: genera `.png` por segmento (en vez de `.mov`)
+- `--preview-phase`: `intro | building | position | closing`
+- `--preview-t`: instante normalizado dentro de la fase (`0.0` a `1.0`)
 
 ## Guía Visual: Obtener Cookies
 

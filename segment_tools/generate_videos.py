@@ -117,7 +117,8 @@ class LeaderboardVideoGenerator:
     BRONZE         = (200, 130,  70, 255)
 
     def __init__(self, output_dir: Path, duration: float = 12.0, fps: int = 60,
-                 width: int = 650, height: int = 550, font_path: Path = None):
+                 width: int = 650, height: int = 550, font_path: Path = None,
+                 panel_scale: float = 0.70):
         self.base_width  = 650
         self.base_height = 550
         self.output_dir  = output_dir
@@ -125,9 +126,14 @@ class LeaderboardVideoGenerator:
         self.fps         = fps
         self.width       = width
         self.height      = height
+        self.panel_scale = max(0.35, min(1.0, panel_scale))
         self.total_frames = int(duration * fps)
-        self.scale_x     = self.width / self.base_width
-        self.scale_y     = self.height / self.base_height
+        self.stage_width  = int(round(self.width * self.panel_scale))
+        self.stage_height = int(round(self.height * self.panel_scale))
+        self.stage_x      = (self.width - self.stage_width) // 2
+        self.stage_y      = (self.height - self.stage_height) // 2
+        self.scale_x      = self.stage_width / self.base_width
+        self.scale_y      = self.stage_height / self.base_height
         self.scale       = min(self.scale_x, self.scale_y)
         self._init_font(font_path)
         self._init_layout()
@@ -148,11 +154,11 @@ class LeaderboardVideoGenerator:
         # Layout basado en el diseño 650x550 y escalado proporcional.
         self.margin = self.sx(20)
 
-        self.col_rank_x  = self.margin + self.sx(12)
-        self.col_name_x  = self.margin + self.sx(58)
-        self.col_date_x  = self.margin + self.sx(278)
-        self.col_speed_x = self.margin + self.sx(420)
-        self.col_time_x  = self.margin + self.sx(510)
+        self.col_rank_x  = self.stage_x + self.margin + self.sx(12)
+        self.col_name_x  = self.stage_x + self.margin + self.sx(58)
+        self.col_date_x  = self.stage_x + self.margin + self.sx(278)
+        self.col_speed_x = self.stage_x + self.margin + self.sx(420)
+        self.col_time_x  = self.stage_x + self.margin + self.sx(510)
 
         self.header_h         = self.sy(50)
         self.col_header_h     = self.sy(26)
@@ -252,7 +258,7 @@ class LeaderboardVideoGenerator:
             panel_height += self.extra_gap + self.extra_sep_h + self.row_h + self.extra_bottom_pad
 
         # Centrar el panel verticalmente: mantiene composición alineada en 4k/1080/short.
-        default_panel_h = self.height - 2 * self.margin
+        default_panel_h = self.stage_height - 2 * self.margin
         dy_offset = (default_panel_h - panel_height) // 2
         return panel_height, dy_offset
 
@@ -260,10 +266,10 @@ class LeaderboardVideoGenerator:
                    alpha: float = 1.0, dy: int = 0, panel_height: int = None):
         """Dibuja fondo + borde del panel. Retorna (x1,y1,x2,y2,panel_w,panel_h)."""
         m = self.margin
-        pw = self.width - 2 * m
-        ph = panel_height if panel_height is not None else (self.height - 2 * m)
-        x1, y1 = m, m + dy
-        x2, y2 = m + pw, m + ph + dy
+        pw = self.stage_width - 2 * m
+        ph = panel_height if panel_height is not None else (self.stage_height - 2 * m)
+        x1, y1 = self.stage_x + m, self.stage_y + m + dy
+        x2, y2 = x1 + pw, y1 + ph
 
         # Sombra exterior
         if alpha > 0.25:
@@ -369,11 +375,11 @@ class LeaderboardVideoGenerator:
         dy_offset = int((1 - slide_t) * self.height * 0.32)
 
         m  = self.margin
-        pw = self.width - 2 * m
-        ph = int(self.height * 0.42)
-        x1 = m
-        y1 = (self.height - ph) // 2 + dy_offset
-        x2 = m + pw
+        pw = self.stage_width - 2 * m
+        ph = int(self.stage_height * 0.42)
+        x1 = self.stage_x + m
+        y1 = self.stage_y + (self.stage_height - ph) // 2 + dy_offset
+        x2 = x1 + pw
         y2 = y1 + ph
 
         # Fondo + borde
@@ -642,11 +648,11 @@ class LeaderboardVideoGenerator:
         shrink   = ease_t * 0.12
 
         m  = self.margin
-        pw = self.width - 2 * m
-        ph = int((self.height - 2 * m) * (1 - shrink))
-        x1 = m
-        y1 = (self.height - ph) // 2 + slide_y
-        x2 = m + pw
+        pw = self.stage_width - 2 * m
+        ph = int((self.stage_height - 2 * m) * (1 - shrink))
+        x1 = self.stage_x + m
+        y1 = self.stage_y + (self.stage_height - ph) // 2 + slide_y
+        x2 = x1 + pw
         y2 = y1 + ph
 
         draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=self.panel_radius,
@@ -731,6 +737,18 @@ class LeaderboardVideoGenerator:
                 return False
 
         return True
+
+    def render_preview_frame(self, segment: Dict, phase: str = "position", t: float = 0.8) -> Image.Image:
+        """Renderiza un frame estático para previsualización."""
+        t = clamp(t)
+        phase = (phase or "position").lower()
+        if phase == "intro":
+            return self.frame_intro(segment, t)
+        if phase == "building":
+            return self.frame_building(segment, t)
+        if phase == "closing":
+            return self.frame_closing(segment, t)
+        return self.frame_position(segment, t)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -843,11 +861,20 @@ def main():
     parser.add_argument("--preset",      type=str,   default=None,
                         choices=["4k", "1080", "short"],
                         help="Preset de salida: 4k=3840x2160, 1080=1920x1080, short=1080x1920")
+    parser.add_argument("--panel-scale", type=float, default=0.70,
+                        help="Fracción del encuadre que ocupa el layout (0.35–1.0). Default: 0.70")
     parser.add_argument("--font",        type=Path,  default=None)
     parser.add_argument("--filter",      type=str,   default=None,
                         help="Filtrar segmentos por nombre (substring)")
     parser.add_argument("--limit",       type=int,   default=None,
                         help="Limitar cantidad de segmentos a procesar")
+    parser.add_argument("--preview-image", action="store_true",
+                        help="Renderiza PNG de preview en vez de generar video")
+    parser.add_argument("--preview-phase", type=str, default="position",
+                        choices=["intro", "building", "position", "closing"],
+                        help="Fase a renderizar en preview-image")
+    parser.add_argument("--preview-t", type=float, default=0.80,
+                        help="Momento normalizado (0.0–1.0) dentro de la fase de preview")
     args = parser.parse_args()
 
     if not args.segments.exists():
@@ -887,22 +914,32 @@ def main():
         width=args.width,
         height=args.height,
         font_path=args.font,
+        panel_scale=args.panel_scale,
     )
-    log(f"Salida: {args.width}x{args.height} @ {args.fps}fps")
+    log(f"Salida: {args.width}x{args.height} @ {args.fps}fps | panel={max(0.35, min(1.0, args.panel_scale)):.2f}")
 
     ok = 0
     for i, seg in enumerate(segments, 1):
         safe = "".join(c for c in seg['name'] if c.isalnum() or c in ' -_').rstrip()
         safe = safe.replace(' ', '_')[:30]
-        out  = args.output_dir / f"segment_{i:02d}_{safe}.mov"
+        if args.preview_image:
+            out = args.output_dir / f"segment_{i:02d}_{safe}_preview.png"
+        else:
+            out = args.output_dir / f"segment_{i:02d}_{safe}.mov"
 
         log(f"\n[{i}/{len(segments)}] {seg['name']}  (pos: {seg.get('my_position', '?')})")
 
-        if gen.generate_video(seg, out):
-            log(f"  ✓ {out}")
+        if args.preview_image:
+            frame = gen.render_preview_frame(seg, phase=args.preview_phase, t=args.preview_t)
+            frame.save(out)
+            log(f"  ✓ Preview: {out}")
             ok += 1
         else:
-            log(f"  ✗ Falló")
+            if gen.generate_video(seg, out):
+                log(f"  ✓ {out}")
+                ok += 1
+            else:
+                log(f"  ✗ Falló")
 
     log(f"\n{'='*50}")
     log(f"Completado: {ok}/{len(segments)} — Directorio: {args.output_dir.absolute()}")
