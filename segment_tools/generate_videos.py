@@ -295,12 +295,16 @@ class LeaderboardVideoGenerator:
         hh = self.header_h
         draw.rounded_rectangle([(x1, y1), (x1 + pw, y1 + hh)],
                                 radius=self.panel_radius, fill=with_alpha(self.HEADER, alpha))
-        # Franja de acento superior
-        draw.rectangle([(x1, y1 + self.sy(2)), (x1 + pw, y1 + self.sy(12))],
-                        fill=with_alpha(self.HEADER_TOP, alpha))
-        # Reaplicar bordes redondeados superiores (el rectangle los tapa)
-        draw.rounded_rectangle([(x1, y1), (x1 + pw, y1 + hh)],
-                                radius=self.panel_radius, outline=None)
+        # Franja de acento superior contenida dentro del header (evita sobresalir en los costados).
+        accent_inset_x = self.ss(2)
+        accent_y1 = y1 + self.sy(2)
+        accent_y2 = y1 + self.sy(12)
+        accent_radius = max(1, self.panel_radius - accent_inset_x)
+        draw.rounded_rectangle(
+            [(x1 + accent_inset_x, accent_y1), (x1 + pw - accent_inset_x, accent_y2)],
+            radius=accent_radius,
+            fill=with_alpha(self.HEADER_TOP, alpha),
+        )
 
         # Ícono ⚡
         draw.text((x1 + self.sx(11), y1 + self.sy(14)), "⚡", font=self.font(self.ss(17)),
