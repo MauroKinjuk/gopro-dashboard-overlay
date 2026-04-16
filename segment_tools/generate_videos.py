@@ -117,7 +117,7 @@ class LeaderboardVideoGenerator:
     SILVER         = (200, 200, 210, 255)
     BRONZE         = (200, 130,  70, 255)
 
-    def __init__(self, output_dir: Path, duration: float = 12.0, fps: int = 60,
+    def __init__(self, output_dir: Path, duration: float = 15.0, fps: int = 60,
                  width: int = 650, height: int = 550, font_path: Path = None,
                  panel_scale: float = 0.70):
         self.base_width  = 650
@@ -137,6 +137,7 @@ class LeaderboardVideoGenerator:
         self.scale_y      = self.stage_height / self.base_height
         self.scale       = min(self.scale_x, self.scale_y)
         self._init_font(font_path)
+        self._init_assets()
         self._init_layout()
 
     def px(self, value: float, min_px: int = 1) -> int:
@@ -198,6 +199,17 @@ class LeaderboardVideoGenerator:
         if not self._font_path:
             log("  ⚠ Usando fuente de sistema (sin TTF)")
 
+    def _init_assets(self):
+        self.crown_icon = None
+        self._crown_cache = {}
+        crown_path = Path(__file__).parent / "crown_icon.png"
+        if crown_path.exists():
+            try:
+                self.crown_icon = Image.open(crown_path).convert("RGBA")
+                log(f"  Crown icon: {crown_path.name}")
+            except Exception:
+                self.crown_icon = None
+
     def font(self, size: int) -> ImageFont.ImageFont:
         if self._font_path:
             try:
@@ -233,7 +245,7 @@ class LeaderboardVideoGenerator:
     def truncate(self, draw: ImageDraw.Draw, text: str, font, max_w: int) -> str:
         bbox = draw.textbbox((0, 0), text, font=font)
         while bbox[2] > max_w and len(text) > 6:
-            text = text[:-4] + "…"
+            text = text[:-4] + "..."
             bbox = draw.textbbox((0, 0), text, font=font)
         return text
 
@@ -292,15 +304,11 @@ class LeaderboardVideoGenerator:
             fill=with_alpha(self.HEADER_TOP, alpha),
         )
 
-        # Ícono ⚡
-        draw.text((x1 + self.sx(11), y1 + self.sy(14)), "⚡", font=self.font(self.ss(17)),
-                  fill=with_alpha(self.TEXT, alpha))
-
         # Nombre del segmento
         name = segment.get('name', 'Segmento')
         f = self.font(self.ss(21) if len(name) < 28 else self.ss(17))
-        name = self.truncate(draw, name, f, pw - self.sx(80))
-        self.shadow_text(draw, (x1 + self.sx(36), y1 + self.sy(13)), name, f,
+        name = self.truncate(draw, name, f, pw - self.sx(30))
+        self.shadow_text(draw, (x1 + self.sx(16), y1 + self.sy(13)), name, f,
                          with_alpha(self.TEXT, alpha))
         return hh
 
@@ -350,7 +358,25 @@ class LeaderboardVideoGenerator:
         rank = int(entry.get('rank', 0))
         name_max_w = max(self.sx(40), self.col_date_x - (self.col_name_x + ox) - self.sx(10))
         name_txt = self.truncate(draw, entry.get('name', ''), f, name_max_w)
-        draw.text((self.col_rank_x  + ox, ty), str(rank),                   font=f, fill=with_alpha(rank_c, alpha))
+        rank_x = self.col_rank_x + ox
+        if rank == 1:
+            # Corona KOM para el primer puesto (estilo Strava), usando crown_icon local.
+            crown_y = row_y + self.sy(9)
+            crown_size = self.ss(15)
+            if self.crown_icon is not None:
+                crown_img = self._crown_cache.get(crown_size)
+                if crown_img is None:
+                    crown_img = self.crown_icon.resize((crown_size, crown_size), Image.LANCZOS)
+                    self._crown_cache[crown_size] = crown_img
+                icon = crown_img.copy()
+                if alpha < 0.999:
+                    mask = icon.getchannel("A").point(lambda p: int(p * clamp(alpha)))
+                    icon.putalpha(mask)
+                img.alpha_composite(icon, dest=(rank_x, crown_y))
+            else:
+                draw.text((rank_x, ty), "1", font=f, fill=with_alpha(rank_c, alpha))
+        else:
+            draw.text((rank_x, ty), str(rank), font=f, fill=with_alpha(rank_c, alpha))
         draw.text((self.col_name_x  + ox, ty), name_txt,                    font=f, fill=with_alpha(text_c, alpha))
         draw.text((self.col_date_x  + ox, ty), entry.get('date', ''),       font=f, fill=with_alpha(self.DIM, alpha))
         draw.text((self.col_speed_x + ox, ty), str(entry.get('speed_kmh', '')), font=f, fill=with_alpha(text_c, alpha))
@@ -362,64 +388,40 @@ class LeaderboardVideoGenerator:
 
     def frame_intro(self, segment: Dict, t: float) -> Image.Image:
         """
-        Panel pequeño que sube desde abajo con bounce. Nombre aparece con fade.
+        Intro simplificada: solo header gris con "Se aproxima un segmento" + nombre.
         """
         img  = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        slide_t   = ease_out_quart(clamp(t * 1.3))
-        alpha     = ease_out_cubic(clamp(t * 2.2))
-        dy_offset = int((1 - slide_t) * self.height * 0.32)
+        # Entrada corta + hold largo + salida suave.
+        in_t   = ease_out_cubic(clamp(t / 0.18))
+        out_t  = ease_in_cubic(clamp((t - 0.92) / 0.08))
+        alpha  = in_t * (1.0 - out_t)
+        slide_y = int((1 - in_t) * self.sy(18))
 
-        m  = self.margin
-        pw = self.stage_width - 2 * m
-        ph = int(self.stage_height * 0.42)
+        m = self.margin
         x1 = self.stage_x + m
-        y1 = self.stage_y + (self.stage_height - ph) // 2 + dy_offset
-        x2 = x1 + pw
-        y2 = y1 + ph
+        x2 = self.stage_x + self.stage_width - m
+        y1 = self.stage_y + self.sy(80) + slide_y
+        y2 = y1 + self.sy(96)
 
-        # Fondo + borde
-        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=self.ss(14),
-                                fill=with_alpha(self.BG, alpha))
-        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=self.ss(14),
-                                outline=with_alpha(self.PANEL_BORDER, alpha), width=self.panel_border)
+        # Solo bloque gris (sin panel/tabla/flecha).
+        draw.rounded_rectangle(
+            [(x1, y1), (x2, y2)],
+            radius=self.ss(12),
+            fill=with_alpha(self.COL_HEADER_BG, alpha),
+        )
 
-        # Header
-        hh = self.sy(48)
-        draw.rounded_rectangle([(x1, y1), (x2, y1 + hh)],
-                                radius=self.panel_radius, fill=with_alpha(self.HEADER, alpha))
+        label = "Se aproxima un segmento:"
+        fl = self.font(self.ss(17))
+        draw.text((x1 + self.sx(18), y1 + self.sy(16)),
+                  label, font=fl, fill=with_alpha(self.DIM, alpha))
 
-        sub = "PRÓXIMO SEGMENTO"
-        fs  = self.font(self.ss(13))
-        bx  = draw.textbbox((0, 0), sub, font=fs)
-        sw  = bx[2] - bx[0]
-        draw.text((x1 + (pw - sw) // 2, y1 + self.sy(15)), sub, font=fs,
-                  fill=with_alpha(self.TEXT, alpha))
-
-        # Nombre con fade tardío
-        name_t = ease_out_cubic(clamp((t - 0.28) / 0.72))
-        if name_t > 0.01:
-            name = segment.get('name', 'Segmento')
-            fn   = self.font(self.ss(28) if len(name) < 22 else self.ss(22))
-            name = self.truncate(draw, name, fn, pw - self.sx(60))
-            bx   = draw.textbbox((0, 0), name, font=fn)
-            nw   = bx[2] - bx[0]
-            nx   = x1 + (pw - nw) // 2
-            ny   = y1 + hh + self.sy(20)
-            self.shadow_text(draw, (nx, ny), name, fn,
-                             with_alpha(self.HIGHLIGHT, name_t), off=self.ss(3))
-
-        # Flecha con bounce tardío
-        arrow_t = ease_out_bounce(clamp((t - 0.65) / 0.35))
-        if arrow_t > 0.01:
-            fa   = self.font(self.ss(13))
-            atxt = "▼  Leaderboard  ▼"
-            bx   = draw.textbbox((0, 0), atxt, font=fa)
-            aw   = bx[2] - bx[0]
-            ay   = y2 - self.sy(28) + int((1 - arrow_t) * self.sy(16))
-            draw.text((x1 + (pw - aw) // 2, ay), atxt, font=fa,
-                      fill=with_alpha(self.DIM, arrow_t * alpha))
+        name = segment.get('name', 'Segmento')
+        fn = self.font(self.ss(28) if len(name) < 22 else self.ss(22))
+        name = self.truncate(draw, name, fn, (x2 - x1) - self.sx(36))
+        draw.text((x1 + self.sx(18), y1 + self.sy(44)),
+                  name, font=fn, fill=with_alpha(self.TEXT, alpha))
 
         return img
     def frame_building(self, segment: Dict, t: float) -> Image.Image:
@@ -635,42 +637,19 @@ class LeaderboardVideoGenerator:
     # ══════════════════════════════════════════════════════════════════════════
 
     def frame_closing(self, segment: Dict, t: float) -> Image.Image:
-        """Panel se encoge y sube, fundiendo a transparente."""
-        img  = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
+        """Cierre limpio: se mantiene el leaderboard y luego se oculta con fade + slide."""
+        base = self.frame_position(segment, 1.0)
+        ease_t = ease_in_cubic(t)
+        alpha = 1.0 - ease_t
+        slide_y = int(ease_t * -self.sy(55))
 
-        ease_t   = ease_in_cubic(t)
-        alpha    = 1.0 - ease_t
-        slide_y  = int(ease_t * -self.sy(55))
-        shrink   = ease_t * 0.12
+        if alpha < 0.999:
+            r, g, b, a = base.split()
+            a = a.point(lambda p: int(p * clamp(alpha)))
+            base = Image.merge("RGBA", (r, g, b, a))
 
-        m  = self.margin
-        pw = self.stage_width - 2 * m
-        ph = int((self.stage_height - 2 * m) * (1 - shrink))
-        x1 = self.stage_x + m
-        y1 = self.stage_y + (self.stage_height - ph) // 2 + slide_y
-        x2 = x1 + pw
-        y2 = y1 + ph
-
-        draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=self.panel_radius,
-                                fill=with_alpha(self.BG, alpha))
-
-        fn   = self.font(self.ss(22))
-        name = segment.get('name', '')[:35]
-        bx   = draw.textbbox((0, 0), name, font=fn)
-        nw   = bx[2] - bx[0]
-        nx   = x1 + (pw - nw) // 2
-        ny   = y1 + ph // 2 - self.sy(22)
-        self.shadow_text(draw, (nx, ny), name, fn,
-                         with_alpha(self.HIGHLIGHT, alpha))
-
-        fm   = self.font(self.ss(14))
-        msg  = "¡Segmento completado!"
-        bx   = draw.textbbox((0, 0), msg, font=fm)
-        mw   = bx[2] - bx[0]
-        draw.text((x1 + (pw - mw) // 2, ny + self.sy(38)), msg, font=fm,
-                  fill=with_alpha(self.DIM, alpha))
-
+        img = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
+        img.paste(base, (0, slide_y), base)
         return img
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -678,15 +657,15 @@ class LeaderboardVideoGenerator:
     # ══════════════════════════════════════════════════════════════════════════
 
     def generate_video(self, segment: Dict, output_file: Path) -> bool:
-        # Timing total = 12 s por defecto
-        #  Fase 1 – Intro:     2.0 s
+        # Timing total = 15 s por defecto
+        #  Fase 1 – Intro:     5.0 s (incluye +3 s de pre-aviso)
         #  Fase 2 – Building:  3.0 s
-        #  Fase 3 – Position:  5.5 s
+        #  Fase 3 – Position:  resto disponible
         #  Fase 4 – Closing:   1.5 s
-        intro_dur    = 2.0
+        intro_dur    = 5.0
         build_dur    = 3.0
-        position_dur = 5.5
         closing_dur  = 1.5
+        position_dur = max(1.0, self.duration - (intro_dur + build_dur + closing_dur))
 
         f_intro    = int(intro_dur    * self.fps)
         f_build    = int(build_dur    * self.fps)
@@ -851,7 +830,7 @@ def main():
     parser.add_argument("--segments",    type=Path, required=True,
                         help="JSON o CSV con datos de segmentos")
     parser.add_argument("--output-dir",  type=Path, default=Path("./segment_videos"))
-    parser.add_argument("--duration",    type=float, default=12.0)
+    parser.add_argument("--duration",    type=float, default=15.0)
     parser.add_argument("--fps",         type=int,   default=60)
     parser.add_argument("--width",       type=int,   default=650)
     parser.add_argument("--height",      type=int,   default=550)
