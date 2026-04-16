@@ -390,39 +390,54 @@ class LeaderboardVideoGenerator:
 
     def frame_intro(self, segment: Dict, t: float) -> Image.Image:
         """
-        Intro simplificada: solo header gris con "Se aproxima un segmento" + nombre.
+        Intro moderna y compacta: notificación tipo "toast" con acento naranja.
         """
         img  = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        # Entrada corta + hold largo + salida suave.
-        in_t   = ease_out_cubic(clamp(t / 0.18))
-        out_t  = ease_in_cubic(clamp((t - 0.92) / 0.08))
+        # Entrada rápida + hold + salida suave
+        in_t   = ease_out_cubic(clamp(t / 0.15))
+        out_t  = ease_in_cubic(clamp((t - 0.90) / 0.10))
         alpha  = in_t * (1.0 - out_t)
-        slide_y = int((1 - in_t) * self.sy(18))
+        slide_y = int((1 - in_t) * self.sy(12))
 
         m = self.margin
         x1 = self.stage_x + m
         x2 = self.stage_x + self.stage_width - m
-        y1 = self.stage_y + self.sy(80) + slide_y
-        y2 = y1 + self.sy(96)
+        box_w = x2 - x1
 
-        # Solo bloque gris (sin panel/tabla/flecha).
+        # Altura compacta (solo lo necesario)
+        box_h = self.sy(62)
+        y1 = self.stage_y + self.sy(120) + slide_y
+        y2 = y1 + box_h
+
+        # Fondo oscuro semi-transparente tipo glassmorphism
+        bg_color = (20, 22, 28, 180)
         draw.rounded_rectangle(
             [(x1, y1), (x2, y2)],
-            radius=self.ss(12),
-            fill=with_alpha(self.COL_HEADER_BG, alpha),
+            radius=self.ss(10),
+            fill=with_alpha(bg_color, alpha),
         )
 
-        label = "Se aproxima un segmento:"
-        fl = self.font(self.ss(17))
-        draw.text((x1 + self.sx(18), y1 + self.sy(16)),
-                  label, font=fl, fill=with_alpha(self.DIM, alpha))
+        # Barra de acento naranja en el borde izquierdo (más moderna)
+        bar_w = self.ss(4)
+        draw.rounded_rectangle(
+            [(x1 + self.sx(2), y1 + self.sy(8)), (x1 + bar_w, y2 - self.sy(8))],
+            radius=self.ss(2),
+            fill=with_alpha(self.HEADER, alpha),
+        )
 
+        # Label "Próximo segmento" más pequeño y sutil
+        label = "Próximo segmento"
+        fl = self.font(self.ss(13))
+        draw.text((x1 + self.sx(16), y1 + self.sy(10)),
+                  label, font=fl, fill=with_alpha((180, 185, 195), alpha))
+
+        # Nombre del segmento más grande, en una sola línea
         name = segment.get('name', 'Segmento')
-        fn = self.font(self.ss(28) if len(name) < 22 else self.ss(22))
-        name = self.truncate(draw, name, fn, (x2 - x1) - self.sx(36))
-        draw.text((x1 + self.sx(18), y1 + self.sy(44)),
+        fn = self.font(self.ss(24) if len(name) < 25 else self.ss(19))
+        name = self.truncate(draw, name, fn, box_w - self.sx(28))
+        draw.text((x1 + self.sx(16), y1 + self.sy(28)),
                   name, font=fn, fill=with_alpha(self.TEXT, alpha))
 
         return img
