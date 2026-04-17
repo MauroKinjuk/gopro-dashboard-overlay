@@ -33,3 +33,4 @@ tests/**/*.diff_over_approved.png
 /tests/fit/2025-07-24-17-55-12.fit
 /.segment_work
 /segment_videos
+/segment_previews
