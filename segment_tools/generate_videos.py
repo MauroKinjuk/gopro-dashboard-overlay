@@ -25,6 +25,9 @@ import math
 import subprocess
 import sys
 import tempfile
+import wave
+import struct
+import array
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -89,6 +92,146 @@ def with_alpha(color: tuple, alpha: float) -> tuple:
     """Devuelve el color con alpha multiplicado por alpha (0.0–1.0)."""
     base_a = color[3] if len(color) == 4 else 255
     return (*color[:3], int(base_a * clamp(alpha)))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Generador de Audio UI
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class AudioGenerator:
+    """Genera efectos de sonido UI programáticamente (sin archivos externos)."""
+
+    def __init__(self, sample_rate: int = 44100):
+        self.sample_rate = sample_rate
+        self.sounds = []  # Lista de (start_time, duration, samples)
+
+    def _generate_sine_wave(self, freq: float, duration: float, volume: float = 0.5,
+                            fade_in: float = 0.0, fade_out: float = 0.0) -> array.array:
+        """Genera una onda sinusoidal con fade opcional."""
+        num_samples = int(self.sample_rate * duration)
+        samples = array.array('h')
+        max_val = 32767 * volume
+
+        for i in range(num_samples):
+            t = i / self.sample_rate
+            # Envolvente ADSR simple
+            amp = 1.0
+            if fade_in > 0 and t < fade_in:
+                amp = t / fade_in
+            elif fade_out > 0 and t > duration - fade_out:
+                amp = (duration - t) / fade_out
+
+            sample = int(max_val * amp * math.sin(2 * math.pi * freq * t))
+            samples.append(sample)
+
+        return samples
+
+    def _generate_noise(self, duration: float, volume: float = 0.3) -> array.array:
+        """Genera ruido blanco (para efectos whoosh)."""
+        import random
+        num_samples = int(self.sample_rate * duration)
+        samples = array.array('h')
+        max_val = 32767 * volume
+
+        for i in range(num_samples):
+            sample = int(max_val * (random.random() * 2 - 1))
+            samples.append(sample)
+
+        return samples
+
+    def _generate_sweep(self, freq_start: float, freq_end: float, duration: float,
+                        volume: float = 0.4) -> array.array:
+        """Genera un sweep de frecuencia (para whoosh)."""
+        num_samples = int(self.sample_rate * duration)
+        samples = array.array('h')
+        max_val = 32767 * volume
+
+        for i in range(num_samples):
+            t = i / num_samples
+            freq = freq_start + (freq_end - freq_start) * t
+            phase = 2 * math.pi * freq * i / self.sample_rate
+            # Envolvente suave
+            amp = math.sin(math.pi * t)  # fade in/out suave
+            sample = int(max_val * amp * math.sin(phase))
+            samples.append(sample)
+
+        return samples
+
+    def add_whoosh(self, start_time: float, duration: float = 0.4, volume: float = 0.15):
+        """Efecto whoosh suave para la intro."""
+        samples = self._generate_sweep(800, 200, duration, volume)
+        self.sounds.append((start_time, duration, samples))
+
+    def add_pop(self, start_time: float, volume: float = 0.25):
+        """Efecto pop corto para aparición de filas."""
+        duration = 0.08
+        # Sonido tipo "pop" = onda cuadrada muy corta con decaimiento rápido
+        num_samples = int(self.sample_rate * duration)
+        samples = array.array('h')
+        max_val = 32767 * volume
+
+        freq = 600
+        for i in range(num_samples):
+            t = i / self.sample_rate
+            # Decaimiento exponencial
+            amp = math.exp(-t * 25)
+            sample = int(max_val * amp * (1 if math.sin(2 * math.pi * freq * t) > 0 else -1))
+            samples.append(sample)
+
+        self.sounds.append((start_time, duration, samples))
+
+    def add_tick(self, start_time: float, volume: float = 0.2):
+        """Efecto tick sutil para escaneo de filas."""
+        duration = 0.04
+        # Tick muy corto y seco (ondas cuadradas de alta frecuencia)
+        num_samples = int(self.sample_rate * duration)
+        samples = array.array('h')
+        max_val = 32767 * volume
+
+        freq = 1200  # Más agudo que el pop
+        for i in range(num_samples):
+            t = i / self.sample_rate
+            # Decaimiento muy rápido para sonido "seco"
+            amp = math.exp(-t * 50)
+            sample = int(max_val * amp * (1 if math.sin(2 * math.pi * freq * t) > 0 else -1))
+            samples.append(sample)
+
+        self.sounds.append((start_time, duration, samples))
+
+    def add_ding(self, start_time: float, volume: float = 0.35):
+        """Efecto ding brillante para highlight de posición."""
+        duration = 0.4
+        # Dos tonos armónicos (campana)
+        samples1 = self._generate_sine_wave(880, duration, volume * 0.6, fade_in=0.01, fade_out=0.3)
+        samples2 = self._generate_sine_wave(1760, duration, volume * 0.4, fade_in=0.01, fade_out=0.25)
+
+        # Mezclar
+        mixed = array.array('h')
+        for s1, s2 in zip(samples1, samples2):
+            mixed.append(min(32767, max(-32768, s1 + s2)))
+
+        self.sounds.append((start_time, duration, mixed))
+
+    def save(self, output_path: Path, total_duration: float):
+        """Guarda el audio mezclado en archivo WAV."""
+        total_samples = int(self.sample_rate * total_duration)
+        final_mix = array.array('h', [0]) * total_samples
+
+        # Mezclar todos los sonidos
+        for start_time, duration, samples in self.sounds:
+            start_sample = int(start_time * self.sample_rate)
+            for i, sample in enumerate(samples):
+                idx = start_sample + i
+                if 0 <= idx < total_samples:
+                    # Clip para evitar saturación
+                    final_mix[idx] = min(32767, max(-32768, final_mix[idx] + sample))
+
+        # Escribir archivo WAV
+        with wave.open(str(output_path), 'w') as wav:
+            wav.setnchannels(1)  # Mono
+            wav.setsampwidth(2)    # 16-bit
+            wav.setframerate(self.sample_rate)
+            wav.writeframes(final_mix.tobytes())
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -813,6 +956,42 @@ class LeaderboardVideoGenerator:
 
         log(f"  Fases: Intro({f_intro}) Build({f_build}) Position({f_position}) Closing({f_closing})")
 
+        # ═══════════════════════════════════════════════════════════════════
+        # Generar pista de audio UI
+        # ═══════════════════════════════════════════════════════════════════
+        audio_gen = AudioGenerator()
+
+        # Whoosh al inicio de la intro (volumen reducido)
+        audio_gen.add_whoosh(0.0, duration=0.4, volume=0.10)
+
+        # Pops para las primeras 5 filas solamente (no todas las 10)
+        leaderboard = segment.get('leaderboard', [])
+        n_rows = min(len(leaderboard), 10)
+        max_pops = min(10, n_rows)  # Solo 5 pops como máximo
+        for i in range(max_pops):
+            # Cada fila empieza en t = i/(n_rows * 1.1) dentro de la fase building
+            row_start_t = intro_dur + (i / (n_rows * 1.1)) * build_dur
+            audio_gen.add_pop(row_start_t, volume=0.15)
+
+        # Ticks durante el escaneo de la fase position
+        my_pos = segment.get('my_position')
+        if my_pos is not None:
+            target_idx = int(my_pos) - 1 if int(my_pos) <= 10 else (n_rows - 1)
+            scan_end_t = intro_dur + build_dur + (0.45 * position_dur)
+            scan_start_t = intro_dur + build_dur
+            scan_duration = scan_end_t - scan_start_t
+
+            # Agregar un tick por cada fila que se escanea (máximo 10)
+            num_ticks = min(10, target_idx + 1)
+            tick_interval = scan_duration / num_ticks if num_ticks > 0 else scan_duration
+            for i in range(num_ticks):
+                tick_time = scan_start_t + (i * tick_interval)
+                audio_gen.add_tick(tick_time, volume=0.15)
+
+            # Ding final cuando se resalta la posición
+            ding_time = scan_end_t
+            audio_gen.add_ding(ding_time, volume=0.20)
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
             gf  = 0  # global frame counter
@@ -832,14 +1011,20 @@ class LeaderboardVideoGenerator:
                     if gf % 60 == 0:
                         log(f"  Frame {gf}/{self.total_frames}")
 
+            # Guardar audio temporal
+            audio_path = tmp / "audio.wav"
+            audio_gen.save(audio_path, self.duration)
+
             log("  Codificando con FFmpeg...")
             cmd = [
                 "ffmpeg", "-y",
                 "-framerate", str(self.fps),
                 "-i", str(tmp / "frame_%05d.png"),
+                "-i", str(audio_path),
                 "-c:v", "qtrle",
                 "-pix_fmt", "argb",
-                "-an",
+                "-c:a", "pcm_s16le",
+                "-shortest",
                 str(output_file),
             ]
             res = subprocess.run(cmd, capture_output=True, text=True)
