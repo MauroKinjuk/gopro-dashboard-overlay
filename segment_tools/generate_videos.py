@@ -156,14 +156,14 @@ class LeaderboardVideoGenerator:
         # Layout basado en el diseño 650x550 y escalado proporcional.
         self.margin = self.sx(20)
 
-        self.col_rank_x  = self.stage_x + self.margin + self.sx(12)
-        self.col_name_x  = self.stage_x + self.margin + self.sx(58)
-        self.col_date_x  = self.stage_x + self.margin + self.sx(278)
-        self.col_speed_x = self.stage_x + self.margin + self.sx(420)
-        self.col_time_x  = self.stage_x + self.margin + self.sx(510)
+        self.col_rank_x  = self.stage_x + self.margin + self.sx(12)   # Posición de N°
+        self.col_name_x  = self.stage_x + self.margin + self.sx(58)   # Posición de Nombre
+        self.col_date_x  = self.stage_x + self.margin + self.sx(240)  # Posición de Fecha
+        self.col_speed_x = self.stage_x + self.margin + self.sx(430)  # Posición de Km/h
+        self.col_time_x  = self.stage_x + self.margin + self.sx(470)  # Posición de Tiempo
 
         self.header_h         = self.sy(50)
-        self.col_header_h     = self.sy(26)
+        self.col_header_h     = self.sy(32)  # Aumentado de 26 para evitar superposición con texto grande
         self.row_h            = self.sy(38)
         self.panel_top_gap    = self.sy(10)
         self.panel_bottom_pad = self.sy(15)
@@ -290,44 +290,110 @@ class LeaderboardVideoGenerator:
 
     def draw_header(self, draw: ImageDraw.Draw, segment: Dict,
                     x1, y1, pw, alpha: float = 1.0) -> int:
-        """Dibuja el header naranja. Retorna la altura del header."""
+        """Dibuja el header moderno con gradiente y efecto de profundidad."""
         hh = self.header_h
-        draw.rounded_rectangle([(x1, y1), (x1 + pw, y1 + hh)],
-                                radius=self.panel_radius, fill=with_alpha(self.HEADER, alpha))
-        # Franja de acento superior contenida dentro del header (evita sobresalir en los costados).
-        accent_inset_x = self.ss(2)
-        accent_y1 = y1 + self.sy(2)
-        accent_y2 = y1 + self.sy(12)
-        accent_radius = max(1, self.panel_radius - accent_inset_x)
+
+        # Sombra sutil debajo del header
+        shadow_offset = self.ss(4)
+        shadow_color = (0, 0, 0, 60)
         draw.rounded_rectangle(
-            [(x1 + accent_inset_x, accent_y1), (x1 + pw - accent_inset_x, accent_y2)],
-            radius=accent_radius,
-            fill=with_alpha(self.HEADER_TOP, alpha),
+            [(x1 + shadow_offset, y1 + shadow_offset), (x1 + pw, y1 + hh)],
+            radius=self.panel_radius,
+            fill=with_alpha(shadow_color, alpha),
         )
 
-        # Nombre del segmento
+        # Fondo principal con gradiente vertical simulado (3 franjas)
+        # Color base naranja
+        header_base = self.HEADER
+        # Color más oscuro para la parte inferior (efecto 3D)
+        header_dark = (185, 55, 0, 255)
+        # Color más claro para la parte superior (brillo)
+        header_light = self.HEADER_TOP
+
+        # Franja superior (brillante)
+        light_h = self.sy(15)
+        draw.rounded_rectangle(
+            [(x1, y1), (x1 + pw, y1 + light_h)],
+            radius=self.panel_radius,
+            fill=with_alpha(header_light, alpha),
+        )
+        # Rectángulo para cubrir la parte inferior del radius de arriba
+        draw.rectangle(
+            [(x1, y1 + light_h // 2), (x1 + pw, y1 + light_h)],
+            fill=with_alpha(header_light, alpha),
+        )
+
+        # Franja media (color base)
+        mid_y1 = y1 + light_h
+        mid_h = hh - light_h - self.sy(8)
+        draw.rectangle(
+            [(x1, mid_y1), (x1 + pw, mid_y1 + mid_h)],
+            fill=with_alpha(header_base, alpha),
+        )
+
+        # Franja inferior (más oscura - profundidad)
+        dark_y1 = mid_y1 + mid_h
+        dark_h = self.sy(8)
+        draw.rounded_rectangle(
+            [(x1, dark_y1), (x1 + pw, y1 + hh)],
+            radius=self.panel_radius,
+            fill=with_alpha(header_dark, alpha),
+        )
+        # Rectángulo para cubrir la parte superior del radius de abajo
+        draw.rectangle(
+            [(x1, dark_y1), (x1 + pw, dark_y1 + dark_h // 2)],
+            fill=with_alpha(header_dark, alpha),
+        )
+
+        # Nombre del segmento - más grande y bold
         name = segment.get('name', 'Segmento')
-        f = self.font(self.ss(21) if len(name) < 28 else self.ss(17))
-        name = self.truncate(draw, name, f, pw - self.sx(30))
-        self.shadow_text(draw, (x1 + self.sx(16), y1 + self.sy(13)), name, f,
-                         with_alpha(self.TEXT, alpha))
+        # Fuente más grande para el header
+        f = self.font(self.ss(24) if len(name) < 26 else self.ss(20))
+        name = self.truncate(draw, name, f, pw - self.sx(40))
+
+        # Sombra del texto más pronunciada para legibilidad
+        shadow_off = self.ss(2)
+        shadow_txt = (120, 40, 0, 200)
+        draw.text((x1 + self.sx(18) + shadow_off, y1 + self.sy(14) + shadow_off),
+                  name, font=f, fill=with_alpha(shadow_txt, alpha))
+        # Texto principal
+        draw.text((x1 + self.sx(18), y1 + self.sy(14)),
+                  name, font=f, fill=with_alpha(self.TEXT, alpha))
+
         return hh
 
     def draw_col_headers(self, draw: ImageDraw.Draw, x1: int, pw: int, y: int, alpha: float = 1.0):
         bar_y1 = y - self.sy(4)
-        bar_y2 = y + self.sy(20)
+        bar_y2 = y + self.sy(26)
+        # Fondo más visible (más opaco y con un toque de color)
+        header_bg = (45, 48, 58, 220)  # Más opaco que COL_HEADER_BG original
         draw.rounded_rectangle(
             [(x1 + self.sx(5), bar_y1), (x1 + pw - self.sx(5), bar_y2)],
             radius=self.ss(8),
-            fill=with_alpha(self.COL_HEADER_BG, alpha),
+            fill=with_alpha(header_bg, alpha),
         )
-        f = self.font(self.ss(13))
-        c = with_alpha(self.DIM, alpha)
+        # Texto más grande - mismo tamaño que las filas (ss(18))
+        f = self.font(self.ss(18))
+        c = with_alpha(self.TEXT, alpha)
         draw.text((self.col_rank_x,  y), "N°",     font=f, fill=c)
         draw.text((self.col_name_x,  y), "Nombre", font=f, fill=c)
-        draw.text((self.col_date_x,  y), "Fecha",  font=f, fill=c)
+
+        # Fecha centrada en su columna
+        date_text = "Fecha"
+        date_col_width = self.col_speed_x - self.col_date_x - self.sx(10)
+        date_w = draw.textbbox((0, 0), date_text, font=f)[2]
+        date_x = self.col_date_x + (date_col_width - date_w) // 2
+        draw.text((date_x,  y), date_text, font=f, fill=c)
+
         draw.text((self.col_speed_x, y), "Km/h",   font=f, fill=c)
-        draw.text((self.col_time_x,  y), "Tiempo", font=f, fill=c)
+
+        # Tiempo centrado en su columna
+        time_text = "Tiempo"
+        # Ancho disponible desde col_time_x hasta el borde derecho del panel menos margen
+        time_col_width = (x1 + pw - self.sx(15)) - self.col_time_x
+        time_w = draw.textbbox((0, 0), time_text, font=f)[2]
+        time_x = self.col_time_x + (time_col_width - time_w) // 2
+        draw.text((time_x, y), time_text, font=f, fill=c)
 
     def draw_leaderboard_row(self, img: Image.Image, draw: ImageDraw.Draw,
                               entry: Dict, row_y: int, row_h: int,
@@ -353,8 +419,9 @@ class LeaderboardVideoGenerator:
         draw.rectangle([(rx1, row_y), (x1 + pw - self.sx(5), row_y + row_h - self.sy(3))],
                         fill=with_alpha(bg, alpha))
 
-        f = self.font(self.ss(16))
-        ty = row_y + self.sy(10)
+        # Texto más grande en las filas
+        f = self.font(self.ss(18))
+        ty = row_y + self.sy(9)
         ox = slide_x  # offset horizontal para texto
 
         rank = int(rank_override if rank_override is not None else entry.get('rank', 0))
@@ -363,8 +430,8 @@ class LeaderboardVideoGenerator:
         rank_x = self.col_rank_x + ox
         if rank == 1:
             # Corona KOM para el primer puesto (estilo Strava), usando crown_icon local.
-            crown_y = row_y + self.sy(9)
-            crown_size = self.ss(15)
+            crown_y = row_y + self.sy(8)
+            crown_size = self.ss(17)
             if self.crown_icon is not None:
                 crown_img = self._crown_cache.get(crown_size)
                 if crown_img is None:
@@ -380,9 +447,22 @@ class LeaderboardVideoGenerator:
         else:
             draw.text((rank_x, ty), str(rank), font=f, fill=with_alpha(rank_c, alpha))
         draw.text((self.col_name_x  + ox, ty), name_txt,                    font=f, fill=with_alpha(text_c, alpha))
-        draw.text((self.col_date_x  + ox, ty), entry.get('date', ''),       font=f, fill=with_alpha(self.DIM, alpha))
+
+        # Fecha centrada en su columna
+        date_val = entry.get('date', '')
+        date_col_width = self.col_speed_x - self.col_date_x - self.sx(10)
+        date_w = draw.textbbox((0, 0), date_val, font=f)[2]
+        date_x = self.col_date_x + (date_col_width - date_w) // 2
+        draw.text((date_x + ox, ty), date_val, font=f, fill=with_alpha(self.DIM, alpha))
+
         draw.text((self.col_speed_x + ox, ty), str(entry.get('speed_kmh', '')), font=f, fill=with_alpha(text_c, alpha))
-        draw.text((self.col_time_x  + ox, ty), entry.get('time', ''),       font=f, fill=with_alpha(text_c, alpha))
+
+        # Tiempo centrado en su columna
+        time_val = entry.get('time', '')
+        time_col_width = (x1 + pw - self.sx(15)) - self.col_time_x
+        time_w = draw.textbbox((0, 0), time_val, font=f)[2]
+        time_x = self.col_time_x + (time_col_width - time_w) // 2
+        draw.text((time_x + ox, ty), time_val, font=f, fill=with_alpha(text_c, alpha))
 
     # ══════════════════════════════════════════════════════════════════════════
     # FASE 1 — Intro
@@ -658,15 +738,28 @@ class LeaderboardVideoGenerator:
                 fill=my_bg,
             )
 
-            # Texto
-            fn  = self.font(self.ss(16))
+            # Texto - mismo tamaño que las demás filas
+            fn  = self.font(self.ss(18))
             hl  = self.HIGHLIGHT
-            ty  = my_row_y + self.sy(10) + slide_yd
+            ty  = my_row_y + self.sy(9) + slide_yd
             draw.text((self.col_rank_x,  ty), str(my_pos),                           font=fn, fill=hl)
             draw.text((self.col_name_x,  ty), str(segment.get('my_name') or "Mauro en Bici"), font=fn, fill=hl)
-            draw.text((self.col_date_x,  ty), str(segment.get('my_date') or ""),     font=fn, fill=hl)
+
+            # Fecha centrada en su columna
+            my_date = str(segment.get('my_date') or "")
+            date_col_width = self.col_speed_x - self.col_date_x - self.sx(10)
+            date_w = draw.textbbox((0, 0), my_date, font=fn)[2]
+            date_x = self.col_date_x + (date_col_width - date_w) // 2
+            draw.text((date_x,  ty), my_date, font=fn, fill=hl)
+
             draw.text((self.col_speed_x, ty), str(segment.get('my_speed') or ""),    font=fn, fill=hl)
-            draw.text((self.col_time_x,  ty), str(segment.get('my_time') or ""),     font=fn, fill=hl)
+
+            # Tiempo centrado en su columna
+            my_time = str(segment.get('my_time') or "")
+            time_col_width = (x1 + pw - self.sx(15)) - self.col_time_x
+            time_w = draw.textbbox((0, 0), my_time, font=fn)[2]
+            time_x = self.col_time_x + (time_col_width - time_w) // 2
+            draw.text((time_x,  ty), my_time, font=fn, fill=hl)
 
         return img
 
