@@ -390,54 +390,80 @@ class LeaderboardVideoGenerator:
 
     def frame_intro(self, segment: Dict, t: float) -> Image.Image:
         """
-        Intro moderna y compacta: notificación tipo "toast" con acento naranja.
+        Intro compacta en ancho: notificación tipo "chip" centrada, solo el ancho necesario.
         """
         img  = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
         # Entrada rápida + hold + salida suave
-        in_t   = ease_out_cubic(clamp(t / 0.15))
-        out_t  = ease_in_cubic(clamp((t - 0.90) / 0.10))
+        in_t   = ease_out_cubic(clamp(t / 0.12))
+        out_t  = ease_in_cubic(clamp((t - 0.88) / 0.12))
         alpha  = in_t * (1.0 - out_t)
-        slide_y = int((1 - in_t) * self.sy(12))
+        slide_y = int((1 - in_t) * self.sy(8))
 
-        m = self.margin
-        x1 = self.stage_x + m
-        x2 = self.stage_x + self.stage_width - m
-        box_w = x2 - x1
-
-        # Altura compacta (solo lo necesario)
-        box_h = self.sy(62)
-        y1 = self.stage_y + self.sy(120) + slide_y
+        # Altura compacta
+        box_h = self.sy(40)
+        y1 = self.stage_y + self.sy(140) + slide_y
         y2 = y1 + box_h
 
-        # Fondo oscuro semi-transparente tipo glassmorphism
-        bg_color = (20, 22, 28, 180)
+        # ═══════════════════════════════════════════════════════════════════
+        # CONFIGURACIÓN DE ANCHO DEL CHIP - Modificá estos valores si querés
+        # ajustar cuánto espacio ocupa la notificación "Próximo segmento"
+        # ═══════════════════════════════════════════════════════════════════
+        # Ancho máximo para el nombre del segmento (aumentalo si se recorta)
+        MAX_NAME_WIDTH = self.sx(700)   # <-- Ajustá este valor (más = más ancho)
+        # Espacio entre "Próximo" y el nombre del segmento
+        GAP_LABEL_NAME = self.sx(20)    # <-- Espaciado entre textos
+        # Padding horizontal del chip
+        CHIP_PADDING_X = self.sx(20)    # <-- Espacio alrededor de todo el contenido
+
+        label = "Próximo segmento:"
+        name = segment.get('name', 'Segmento')
+        # Mismo tamaño de fuente para label y nombre
+        fn = self.font(self.ss(18) if len(name) < 30 else self.ss(15))
+        fl = fn  # Mismo tamaño que el nombre
+        label_w = draw.textbbox((0, 0), label, font=fl)[2]
+
+        # Truncar primero para saber el ancho real que ocupará
+        name = self.truncate(draw, name, fn, MAX_NAME_WIDTH)
+        name_w = draw.textbbox((0, 0), name, font=fn)[2]
+
+        # Ancho total: padding izq + dot + gap + label + gap + nombre + padding der
+        # Ahora con padding explícito en ambos lados
+        pad_x = CHIP_PADDING_X
+        dot_r = self.ss(5)
+        gap = self.sx(8)
+        content_w = pad_x + (dot_r * 2) + gap + label_w + GAP_LABEL_NAME + name_w + pad_x
+
+        # Centrar horizontalmente en el stage
+        stage_center_x = self.stage_x + self.stage_width // 2
+        x1 = stage_center_x - content_w // 2
+        x2 = x1 + content_w
+
+        # Fondo oscuro semi-transparente tipo chip
+        bg_color = (22, 24, 30, 200)
         draw.rounded_rectangle(
             [(x1, y1), (x2, y2)],
-            radius=self.ss(10),
+            radius=self.ss(20),
             fill=with_alpha(bg_color, alpha),
         )
 
-        # Barra de acento naranja en el borde izquierdo (más moderna)
-        bar_w = self.ss(4)
-        draw.rounded_rectangle(
-            [(x1 + self.sx(2), y1 + self.sy(8)), (x1 + bar_w, y2 - self.sy(8))],
-            radius=self.ss(2),
+        # Indicador naranja circular
+        dot_x = x1 + pad_x + dot_r
+        dot_y = y1 + box_h // 2
+        draw.ellipse(
+            [(dot_x - dot_r, dot_y - dot_r), (dot_x + dot_r, dot_y + dot_r)],
             fill=with_alpha(self.HEADER, alpha),
         )
 
-        # Label "Próximo segmento" más pequeño y sutil
-        label = "Próximo segmento"
-        fl = self.font(self.ss(13))
-        draw.text((x1 + self.sx(16), y1 + self.sy(10)),
-                  label, font=fl, fill=with_alpha((180, 185, 195), alpha))
+        # Label "Próximo" - mismo color blanco que el nombre, mismo tamaño
+        label_x = dot_x + dot_r + gap
+        draw.text((label_x, y1 + self.sy(9)),
+                  label, font=fl, fill=with_alpha(self.TEXT, alpha))
 
-        # Nombre del segmento más grande, en una sola línea
-        name = segment.get('name', 'Segmento')
-        fn = self.font(self.ss(24) if len(name) < 25 else self.ss(19))
-        name = self.truncate(draw, name, fn, box_w - self.sx(28))
-        draw.text((x1 + self.sx(16), y1 + self.sy(28)),
+        # Nombre del segmento - ahora posicionado correctamente con espacio antes del padding derecho
+        name_x = label_x + label_w + GAP_LABEL_NAME
+        draw.text((name_x, y1 + self.sy(9)),
                   name, font=fn, fill=with_alpha(self.TEXT, alpha))
 
         return img
