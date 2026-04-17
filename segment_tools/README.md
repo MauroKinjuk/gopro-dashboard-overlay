@@ -296,7 +296,7 @@ python setup_strava_auth.py
 
 ```bash
 # 1. Preparar datos de segmentos
-python build_segment_overlay_data.py --gpx "ruta/a/MiCarrera.gpx" --activity-url "https://www.strava.com/activities/12345678" --output segments_timed.json
+python build_segment_overlay_data.py --gpx "C:\Users\tordy\Downloads\Vuelta_ciclista_por_la_mañana.gpx" --activity-url "https://www.strava.com/activities/16854423062" --output segments_timed.json
 
 # 2. Generar videos de leaderboard (un video por segmento)
 python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_videos
@@ -343,10 +343,10 @@ Para ver cómo quedaría el diseño, podés exportar imágenes PNG:
 
 ```bash
 # Preview de la fase principal (position)
-python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_previews --preset 4k --panel-scale 0.70 --preview-image --preview-phase position --preview-t 0.82
+python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_videos --preset 4k --panel-scale 0.70 --preview-image --preview-phase position --preview-t 0.82
 
 # Preview de intro
-python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_previews --preset short --preview-image --preview-phase intro --preview-t 0.60
+python segment_tools/generate_videos.py --segments segments_timed.json --output-dir ./segment_videos --preset short --preview-image --preview-phase intro --preview-t 0.60
 ```
 
 Parámetros de preview:
@@ -393,20 +393,3 @@ Ideas para extender esta funcionalidad:
 4. **Comparativa en vivo**: Mostrar "+12s vs PR" mientras pedaleás
 5. **Segmentos favoritos**: Marcar ciertos segmentos para siempre mostrarlos
 
-## Archivos Modificados/Creados
-
-**Nuevos archivos:**
-- `gopro_overlay/segment_matcher.py` - Matching de segmentos
-- `gopro_overlay/widgets/segment_overlay.py` - Widget de visualización
-- `build_segment_overlay_data.py` - Script orquestador
-- `setup_strava_auth.py` - **Helper interactivo para configurar credenciales**
-- `bin/gopro-segments.py` - Script para generar overlay desde GPX
-- `bin/gopro-segments.bat` - Batch para Windows (fácil uso)
-- `gopro_overlay/layouts/segment-layout.xml` - Layout completo (segmentos + métricas)
-- `gopro_overlay/layouts/segment-only-layout.xml` - Layout solo segmentos (para CapCut)
-- `docs/segment-overlay.md` - Esta documentación
-
-**Modificaciones menores:**
-- `gopro_overlay/layout_xml.py` - Agregado `create_segment_overlay()`
-- `gopro_overlay/arguments.py` - Agregado `--segment-data`
-- `gopro_overlay/ffmpeg_profile.py` - Agregados perfiles con alpha (transparencia)
