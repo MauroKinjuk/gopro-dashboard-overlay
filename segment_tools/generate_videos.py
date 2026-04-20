@@ -324,6 +324,11 @@ class LeaderboardVideoGenerator:
         candidates = []
         if font_path and Path(font_path).exists():
             candidates.append(str(font_path))
+        # Coolvetica.otf del repo fork-gopro-dashboard-overlay (fuente por defecto)
+        repo_root = Path(__file__).resolve().parent.parent
+        coolvetica = repo_root / "Coolvetica.otf"
+        if coolvetica.exists():
+            candidates.append(str(coolvetica))
         candidates += [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",

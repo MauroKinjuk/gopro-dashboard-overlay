@@ -27,7 +27,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 
 # Asegurar que el path del proyecto esté disponible
 PROJECT_ROOT = Path(__file__).parent
@@ -114,6 +114,48 @@ def run_segments_retriever(activity_url: str, output_file: Path) -> bool:
     return False
 
 
+def _check_strava_cookie(strava_project: Path) -> bool:
+    """Verifica si .env tiene STRAVA_COOKIES_HEADER. Retorna True si existe y no esta vacio."""
+    env_path = strava_project / ".env"
+    if not env_path.exists():
+        return False
+    try:
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            s = line.strip()
+            if s.startswith("STRAVA_COOKIES_HEADER="):
+                value = s.split("=", 1)[1].strip()
+                return bool(value)
+    except Exception:
+        pass
+    return False
+
+
+def _prompt_refresh_cookie(strava_project: Path) -> bool:
+    """Sugiere correr refresh_strava_cookie.py. Retorna True si se corrio exitosamente."""
+    refresh_script = strava_project / "refresh_strava_cookie.py"
+    if not refresh_script.exists():
+        print("[WARN] No se encontro refresh_strava_cookie.py")
+        return False
+    print("")
+    print("=" * 60)
+    print("  Cookie de Strava no encontrado en .env")
+    print("  Los leaderboards necesitan sesion activa.")
+    print("=" * 60)
+    resp = input("  Abrir Chromium para loguearte en Strava? [S/n]: ").strip().lower()
+    if resp and resp not in ("s", "si", "y", "yes"):
+        print("  Saltando refresh de cookie...")
+        return False
+    try:
+        result = subprocess.run(
+            [sys.executable, str(refresh_script)],
+            cwd=str(refresh_script.parent)
+        )
+        return result.returncode == 0
+    except Exception as e:
+        print(f"[ERROR] Error corriendo refresh: {e}")
+        return False
+
+
 def run_segments_scraper(segments_csv: Path, output_dir: Path) -> bool:
     """
     Ejecuta segments_scraper.py para obtener leaderboards de cada segmento.
@@ -125,6 +167,10 @@ def run_segments_scraper(segments_csv: Path, output_dir: Path) -> bool:
         print(f"⚠️ No se encontró {scraper_script}")
         return False
     
+    # Verificar cookie antes de correr
+    if not _check_strava_cookie(STRAVA_PROJECT):
+        _prompt_refresh_cookie(STRAVA_PROJECT)
+    
     print("🏆 Obteniendo leaderboards de Strava (scraping)...")
     
     # Copiar CSV al directorio del scraper
@@ -133,15 +179,14 @@ def run_segments_scraper(segments_csv: Path, output_dir: Path) -> bool:
     shutil.copy(str(segments_csv), str(target_csv))
     
     try:
+        # No capturar output: mostrarlo en vivo para que el usuario vea warnings
         result = subprocess.run(
-            [sys.executable, str(scraper_script)],
-            capture_output=True,
-            text=True,
+            [sys.executable, "-u", str(scraper_script)],
             cwd=str(scraper_script.parent)
         )
         
         if result.returncode == 0:
-            print("✅ Leaderboards obtenidos")
+            print("✅ Scraper finalizado")
             
             # Mover leaderboards al directorio de salida
             leaderboards_source = scraper_script.parent / "leaderboards"
@@ -149,12 +194,18 @@ def run_segments_scraper(segments_csv: Path, output_dir: Path) -> bool:
                 output_dir.mkdir(parents=True, exist_ok=True)
                 for f in leaderboards_source.glob("*.csv"):
                     shutil.copy(str(f), str(output_dir / f.name))
+                # segment_meta.csv (distancia, desnivel, pendiente, atletas) ya entra en *.csv
                 for f in leaderboards_source.glob("my_rank_*.txt"):
                     shutil.copy(str(f), str(output_dir / f.name))
+                # Copiar tambien debug HTMLs para troubleshooting
+                for f in leaderboards_source.glob("debug_empty_*.html"):
+                    shutil.copy(str(f), str(output_dir / f.name))
                 print(f"📄 Leaderboards guardados en: {output_dir}")
+                # Analisis post-scraping: contar empties
+                _report_scraping_results(segments_csv, output_dir, STRAVA_PROJECT)
                 return True
         else:
-            print(f"⚠️ Warning al obtener leaderboards: {result.stderr}")
+            print(f"⚠️ Scraper termino con codigo {result.returncode}")
             return False
             
     except Exception as e:
@@ -162,6 +213,50 @@ def run_segments_scraper(segments_csv: Path, output_dir: Path) -> bool:
         return False
     
     return False
+
+
+def _report_scraping_results(segments_csv: Path, leaderboards_dir: Path, strava_project: Path) -> None:
+    """Cuenta cuantos leaderboards quedaron vacios y advierte si hay fallos masivos."""
+    import csv as _csv
+    if not segments_csv.exists():
+        return
+    segment_ids = []
+    try:
+        with segments_csv.open("r", newline="", encoding="utf-8") as f:
+            reader = _csv.DictReader(f)
+            for row in reader:
+                sid = (row.get("segment_id") or row.get("id") or "").strip()
+                if sid:
+                    segment_ids.append(sid)
+    except Exception:
+        return
+    if not segment_ids:
+        return
+    
+    empty = []
+    ok = []
+    for sid in segment_ids:
+        lb_path = leaderboards_dir / f"leaderboard_{sid}.csv"
+        if not lb_path.exists():
+            empty.append(sid)
+            continue
+        # CSV con solo header es < 100 bytes
+        if lb_path.stat().st_size < 100:
+            empty.append(sid)
+        else:
+            ok.append(sid)
+    
+    print("")
+    print("=" * 60)
+    print(f"📊 Leaderboards: {len(ok)}/{len(segment_ids)} con datos")
+    if empty:
+        print(f"   {len(empty)} vacios: {', '.join(empty[:5])}{'...' if len(empty) > 5 else ''}")
+        # Si mas de la mitad fallaron, probablemente es cookie expirada
+        if len(empty) >= len(segment_ids) / 2:
+            print("")
+            print("  ⚠️  Muchos leaderboards vacios. Probable cookie expirado.")
+            print(f"  ⚠️  Corre: python {strava_project / 'refresh_strava_cookie.py'}")
+    print("=" * 60)
 
 
 def build_segments_json_from_csv(segments_csv: Path, output_file: Path) -> bool:
@@ -260,6 +355,140 @@ def enrich_segments_with_strava_api(segments_json: Path, activity_url: str) -> b
         return False
 
 
+def fetch_activity_distance_stream(activity_id: str, output_file: Path) -> Optional[List[float]]:
+    """
+    Obtiene el stream de distancia de una actividad de Strava.
+    Retorna el array de distancias acumuladas o None si falla.
+    """
+    try:
+        STRAVA_PROJECT = PROJECT_ROOT.parent / "Strava-Scraper-Leaderboard"
+        sys.path.insert(0, str(STRAVA_PROJECT))
+        from auth_strava import load_env
+        
+        env_path = STRAVA_PROJECT / ".env"
+        if not env_path.exists():
+            return None
+        
+        env = load_env(env_path)
+        token = env.get('STRAVA_ACCESS_TOKEN')
+        
+        if not token:
+            return None
+        
+        import requests
+        
+        headers = {"Authorization": f"Bearer {token}"}
+        url = f"https://www.strava.com/api/v3/activities/{activity_id}/streams?keys=distance"
+        
+        resp = requests.get(url, headers=headers, timeout=30)
+        
+        if resp.status_code == 200:
+            streams = resp.json()
+            for stream in streams:
+                if stream.get('type') == 'distance':
+                    distance_data = stream.get('data', [])
+                    # Guardar en archivo
+                    with open(output_file, 'w', encoding='utf-8') as f:
+                        json.dump(distance_data, f)
+                    print(f"   📊 Stream de distancia guardado ({len(distance_data)} puntos)")
+                    return distance_data
+        else:
+            print(f"   ⚠️ No se pudo obtener stream de distancia (HTTP {resp.status_code})")
+        
+        return None
+        
+    except Exception as e:
+        print(f"   ⚠️ Error obteniendo stream de distancia: {e}")
+        return None
+
+
+def fetch_segment_efforts_with_indices(activity_id: str, segments_json: Path, output_file: Path) -> bool:
+    """
+    Obtiene los segment efforts de una actividad con sus start_index.
+    Esto permite saber la posición exacta en el stream de distancia.
+    """
+    try:
+        STRAVA_PROJECT = PROJECT_ROOT.parent / "Strava-Scraper-Leaderboard"
+        sys.path.insert(0, str(STRAVA_PROJECT))
+        from auth_strava import load_env
+        
+        env_path = STRAVA_PROJECT / ".env"
+        if not env_path.exists():
+            return False
+        
+        env = load_env(env_path)
+        token = env.get('STRAVA_ACCESS_TOKEN')
+        
+        if not token:
+            return False
+        
+        import requests
+        
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        # Obtener detalle de la actividad que incluye segment_efforts
+        url = f"https://www.strava.com/api/v3/activities/{activity_id}?include_all_efforts=true"
+        resp = requests.get(url, headers=headers, timeout=30)
+        
+        if resp.status_code != 200:
+            print(f"   ⚠️ No se pudo obtener detalle de actividad (HTTP {resp.status_code})")
+            return False
+        
+        activity_data = resp.json()
+        efforts = activity_data.get('segment_efforts', [])
+        
+        if not efforts:
+            print(f"   ⚠️ La actividad no tiene segment efforts")
+            return False
+        
+        print(f"   📋 Actividad tiene {len(efforts)} segment efforts totales")
+        
+        # Cargar segmentos para mapear por ID
+        with open(segments_json, 'r', encoding='utf-8') as f:
+            segments_data = json.load(f)
+        
+        segment_ids = {str(s['id']) for s in segments_data.get('segments', [])}
+        
+        # Crear dict de efforts por segment_id (tomar el primero - PR)
+        efforts_by_segment: Dict[str, Dict] = {}
+        for effort in efforts:
+            seg_id = str(effort.get('segment', {}).get('id', ''))
+            if seg_id and seg_id in segment_ids:
+                # Si ya existe, comparar por pr_rank (1 es mejor)
+                existing = efforts_by_segment.get(seg_id)
+                if existing is None:
+                    efforts_by_segment[seg_id] = effort
+                else:
+                    # Tomar el que tiene mejor pr_rank (menor)
+                    existing_rank = existing.get('pr_rank') or 999
+                    new_rank = effort.get('pr_rank') or 999
+                    if new_rank < existing_rank:
+                        efforts_by_segment[seg_id] = effort
+        
+        # Guardar efforts con sus índices
+        result = {}
+        for seg_id, effort in efforts_by_segment.items():
+            result[seg_id] = {
+                'id': effort.get('id'),
+                'name': effort.get('name', '').strip(),
+                'start_index': effort.get('start_index'),
+                'end_index': effort.get('end_index'),
+                'distance_m': effort.get('distance'),
+                'elapsed_time': effort.get('elapsed_time'),
+                'pr_rank': effort.get('pr_rank'),
+            }
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(result, f, indent=2, ensure_ascii=False)
+        
+        print(f"   🎯 Segment efforts guardados ({len(result)} segmentos)")
+        return True
+        
+    except Exception as e:
+        print(f"   ⚠️ Error obteniendo segment efforts: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Prepara datos de segmentos Strava para overlay en videos",
@@ -328,6 +557,19 @@ Ejemplos:
                 build_segments_json_from_csv(csv_file, segments_json)
                 # Intentar enriquecer con API
                 enrich_segments_with_strava_api(segments_json, args.activity_url)
+                
+                # Obtener stream de distancia y segment efforts con índices
+                import re
+                activity_id_match = re.search(r'/activities/(\d+)', args.activity_url)
+                if activity_id_match:
+                    activity_id = activity_id_match.group(1)
+                    print("\n📊 Obteniendo datos de distancia de Strava...")
+                    distance_stream_file = work_dir / "distance_stream.json"
+                    fetch_activity_distance_stream(activity_id, distance_stream_file)
+                    
+                    print("   🎯 Obteniendo segment efforts con índices...")
+                    efforts_file = work_dir / "segment_efforts.json"
+                    fetch_segment_efforts_with_indices(activity_id, segments_json, efforts_file)
         else:
             print("[ERROR] No se pudieron obtener segmentos de la API")
             sys.exit(1)
@@ -379,12 +621,18 @@ Ejemplos:
     print(f"   Preview distance: {args.preview_distance}m")
     
     try:
+        # Preparar archivos opcionales de Strava si existen
+        distance_stream_file = work_dir / "distance_stream.json"
+        segment_efforts_file = work_dir / "segment_efforts.json"
+        
         timed_segments = build_segment_data(
             gpx_file=args.gpx,
             segments_json=segments_json,
             leaderboards_dir=leaderboards_dir,
             output_file=args.output,
-            preview_distance_m=args.preview_distance
+            preview_distance_m=args.preview_distance,
+            distance_stream_file=distance_stream_file if distance_stream_file.exists() else None,
+            segment_efforts_file=segment_efforts_file if segment_efforts_file.exists() else None
         )
         
         print(f"\n✅ ÉXITO - {len(timed_segments)} segmentos procesados")
@@ -397,7 +645,9 @@ Ejemplos:
             end = seg.end_time.strftime("%H:%M:%S")
             preview = seg.preview_time.strftime("%H:%M:%S")
             pos = seg.my_position or "?"
-            print(f"  • {seg.name[:40]:<40} | Preview: {preview} | Inicio: {start} | Pos: #{pos}")
+            dist_km = seg.start_distance_km
+            dist_str = f"{dist_km:.2f}km" if dist_km is not None else "?km"
+            print(f"  • {seg.name[:35]:<35} | {dist_str:<8} | Preview: {preview} | Inicio: {start} | Pos: #{pos}")
         
         print("\n" + "=" * 60)
         print("🎬 LISTO PARA RENDERIZAR")

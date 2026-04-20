@@ -280,6 +280,17 @@ El scraper busca tu nombre exacto "Mauro Kinjuk" en los leaderboards.
 pip install requests beautifulsoup4
 ```
 
+### "Leaderboards vacíos / Strava devolvió login"
+
+Las cookies de sesión expiraron (~2 semanas de vida útil).
+
+**Solución:** refrescalas automáticamente:
+```bash
+cd /ruta/a/Strava-Scraper-Leaderboard
+python refresh_strava_cookie.py
+```
+La primera vez te pide login manual en el Chromium que abre. Las siguientes reutilizan la sesión guardada en `.playwright_profile/` y corren sin intervención.
+
 ## Flujo Completo Paso a Paso
 
 ### Primera vez (setup inicial)

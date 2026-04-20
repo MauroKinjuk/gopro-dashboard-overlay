@@ -34,3 +34,6 @@ tests/**/*.diff_over_approved.png
 /.segment_work
 /segment_videos
 /segment_previews
+*.mov
+segments_timed.json
+/.segment_work_test

@@ -39,6 +39,7 @@ def parse_segments_timed(segments_file: Path):
             'preview_time': datetime.fromisoformat(seg['preview_time']),
             'start_time': datetime.fromisoformat(seg['start_time']),
             'end_time': datetime.fromisoformat(seg['end_time']),
+            'start_distance_km': seg.get('start_distance_km'),
             'leaderboard': seg.get('leaderboard', []),
             'my_position': seg.get('my_position'),
             'my_time': seg.get('my_time'),
@@ -83,6 +84,7 @@ def generate_segment_video(segment, gpx_file: Path, output_file: Path, resolutio
             'preview_time': segment['preview_time'].isoformat(),
             'start_time': segment['start_time'].isoformat(),
             'end_time': segment['end_time'].isoformat(),
+            'start_distance_km': segment.get('start_distance_km'),
             'leaderboard': segment['leaderboard'],
             'my_position': segment['my_position'],
             'my_time': segment['my_time'],
@@ -194,11 +196,18 @@ def main():
     for i, segment in enumerate(segments, 1):
         # Sanitizar nombre para archivo
         safe_name = "".join(c for c in segment['name'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
-        safe_name = safe_name.replace(' ', '_')[:30]
+        safe_name = safe_name.replace(' ', '_')[:25]  # Reducido para dejar espacio al km
         
-        output_file = args.output_dir / f"segment_{i:02d}_{safe_name}.mov"
+        # Obtener distancia de inicio para el nombre del archivo
+        start_dist_km = segment.get('start_distance_km')
+        if start_dist_km is not None:
+            dist_str = f"{start_dist_km:.1f}km"
+        else:
+            dist_str = "unknown"
         
-        log(f"\n[{i}/{len(segments)}] {segment['name']}")
+        output_file = args.output_dir / f"segment_{i:02d}_{dist_str}_{safe_name}.mov"
+        
+        log(f"\n[{i}/{len(segments)}] {segment['name']} @ {dist_str}")
         
         if generate_segment_video(
             segment=segment,

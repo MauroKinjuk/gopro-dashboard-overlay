@@ -116,53 +116,41 @@ STRAVA_COOKIES_HEADER=
         return False
 
 
-def setup_cookies():
-    """Guía para obtener cookies del navegador"""
-    print_section("PASO 2: Cookies del Navegador")
-    
-    print("Las cookies son necesarias para hacer scraping de los leaderboards.")
-    print("Strava no expone esta info por API pública.")
-    print()
-    print("INSTRUCCIONES:")
-    print()
-    print("1. Abrí Chrome/Edge y andá a https://www.strava.com")
-    print("2. Logueate con tu cuenta")
-    print("3. Presioná F12 para abrir DevTools")
-    print("4. Andá a la pestaña 'Network' (o 'Red')")
-    print("5. Recargá la página (F5)")
-    print("6. En la lista de requests, buscá uno que diga 'strava.com'")
-    print("7. Click en el request → Headers → Request Headers")
-    print("8. Buscá 'cookie:' y copiá TODO el valor")
-    print()
-    print("   Ejemplo de cómo se ve:")
-    print("   cookie: _strava4_session=abc123; _strava4_session_csrf_token=xyz789; ...")
-    print()
-    print("9. Pegalo acá abajo (podés pegar varias líneas, terminá con ENTER):")
-    print()
-    
-    # Leer cookies (multilinea)
-    print("Pegá las cookies (ENTER dos veces para terminar):")
-    lines = []
-    while True:
-        try:
-            line = input()
-            if not line and lines:  # Enter en línea vacía, terminamos
-                break
-            lines.append(line)
-        except EOFError:
-            break
-    
-    cookies = " ".join(lines).strip()
-    
-    if not cookies:
-        print("❌ No se ingresaron cookies")
+def _ensure_playwright() -> bool:
+    """Verifica que playwright este instalado. Si no, ofrece instalarlo."""
+    try:
+        import playwright  # noqa: F401
+        return True
+    except ImportError:
+        pass
+    print("⚠️  Playwright no está instalado (necesario para obtener cookies auto).")
+    resp = input("¿Instalarlo ahora? [S/n]: ").strip().lower()
+    if resp and resp not in ("s", "si", "y", "yes"):
         return False
-    
-    # Limpiar cookies (quitar posible prefijo "cookie: " o "Cookie: ")
-    if cookies.lower().startswith("cookie:"):
-        cookies = cookies.split(":", 1)[1].strip()
-    
-    # Guardar en .env
+    print("📦 Instalando playwright...")
+    r1 = subprocess.run([sys.executable, "-m", "pip", "install", "playwright"])
+    if r1.returncode != 0:
+        print("❌ Falló pip install playwright")
+        return False
+    print("📦 Descargando Chromium (primera vez, ~200MB)...")
+    r2 = subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"])
+    if r2.returncode != 0:
+        print("❌ Falló playwright install chromium")
+        return False
+    print("✅ Playwright instalado")
+    return True
+
+
+def setup_cookies():
+    """Obtiene cookies de sesión de Strava automáticamente vía Playwright."""
+    print_section("PASO 2: Cookies de Sesión (automático)")
+
+    print("Vamos a obtener las cookies de Strava abriendo un navegador real.")
+    print("La primera vez te logueás manualmente. Las siguientes, se reutiliza")
+    print("la sesión guardada y todo es automático.")
+    print()
+
+    # Localizar proyecto Strava
     strava_project = Path(__file__).parent.parent / "Strava-Scraper-Leaderboard"
     if not strava_project.exists():
         print(f"⚠️  No se encontró el proyecto en: {strava_project}")
@@ -172,35 +160,60 @@ def setup_cookies():
         else:
             print("❌ No se puede continuar sin el proyecto Strava-Scraper-Leaderboard")
             return False
-    env_path = strava_project / ".env"
-    
-    if env_path.exists():
-        content = env_path.read_text(encoding='utf-8')
-        # Reemplazar línea existente o agregar al final
-        if 'STRAVA_COOKIES_HEADER=' in content:
-            lines = content.split('\n')
-            new_lines = []
-            for line in lines:
-                if line.startswith('STRAVA_COOKIES_HEADER='):
-                    new_lines.append(f'STRAVA_COOKIES_HEADER={cookies}')
-                else:
-                    new_lines.append(line)
-            content = '\n'.join(new_lines)
-        else:
-            content += f"\nSTRAVA_COOKIES_HEADER={cookies}\n"
-        
-        env_path.write_text(content, encoding='utf-8')
-    else:
-        print(f"❌ No se encontró {env_path}. Ejecutá primero el Paso 1.")
+
+    refresh_script = strava_project / "refresh_strava_cookie.py"
+    if not refresh_script.exists():
+        print(f"❌ No se encontró {refresh_script}")
+        print("   Este script debería estar en el proyecto Strava-Scraper-Leaderboard.")
         return False
-    
+
+    # Asegurar playwright
+    if not _ensure_playwright():
+        print("❌ No se puede continuar sin Playwright.")
+        print("   Como fallback, podés editar .env manualmente con STRAVA_COOKIES_HEADER=...")
+        return False
+
+    env_path = strava_project / ".env"
+    if not env_path.exists():
+        print(f"⚠️  No se encontró {env_path} (normalmente se crea en el Paso 1)")
+        print("   Creando .env vacío para poder guardar el cookie...")
+        env_path.write_text("", encoding='utf-8')
+
+    print("🌐 Abriendo navegador para login en Strava...")
+    print("   (Si ya hay sesión activa, se cerrará solo en pocos segundos)")
     print()
-    print(f"✅ Cookies guardadas en: {env_path}")
-    print()
-    print("⚠️  IMPORTANTE: Las cookies expiran en ~1 semana.")
-    print("    Si el scraping falla, repetí este paso para actualizarlas.")
-    
-    return True
+
+    result = subprocess.run(
+        [sys.executable, str(refresh_script)],
+        cwd=str(strava_project)
+    )
+
+    if result.returncode != 0:
+        print()
+        print("❌ Falló la obtención de cookies.")
+        print(f"   Intentá manualmente: cd {strava_project} && python refresh_strava_cookie.py")
+        return False
+
+    # Verificar que quedaron grabadas
+    content = env_path.read_text(encoding='utf-8') if env_path.exists() else ""
+    has_cookie = False
+    for line in content.splitlines():
+        if line.startswith("STRAVA_COOKIES_HEADER=") and len(line) > len("STRAVA_COOKIES_HEADER="):
+            has_cookie = True
+            break
+
+    if has_cookie:
+        print()
+        print(f"✅ Cookies guardadas en: {env_path}")
+        print()
+        print("ℹ️  La sesión queda guardada en .playwright_profile/")
+        print("    La próxima vez que corras refresh_strava_cookie.py no pedirá login.")
+        return True
+    else:
+        print()
+        print("⚠️  El script terminó pero no se grabó STRAVA_COOKIES_HEADER en .env.")
+        print("    Probablemente el login no se completó. Reintentá.")
+        return False
 
 
 def test_setup():
