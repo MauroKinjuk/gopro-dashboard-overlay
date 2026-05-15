@@ -35,11 +35,11 @@ from .widgets.widgets import simple_icon, Translate, Composite, Frame, Widget
 
 def load_xml_layout(filepath: Path):
     if filepath.exists():
-        with filepath.open() as f:
+        with filepath.open(encoding="utf-8") as f:
             return f.read()
 
     with as_file(files(layouts) / f"{filepath.name}.xml") as fn:
-        with open(fn) as f:
+        with open(fn, encoding="utf-8") as f:
             return f.read()
 
 
@@ -687,9 +687,18 @@ class Widgets:
         )
 
     @allow_attributes({"width", "height", "metric", "units", "fill", "zone-divider", "outline",
-                       "outline-width", "cr", "max", "min", "z1", "z2", "z3", "z0-rgb", "z1-rgb",
-                       "z2-rgb", "z3-rgb"})
+                       "outline-width", "cr", "max", "min", "z1", "z2", "z3", "z4", "z0-rgb", "z1-rgb",
+                       "z2-rgb", "z3-rgb", "z4-rgb", "mode", "indicator", "indicator-width", "inactive-alpha",
+                       "zone-widths"})
     def create_zone_bar(self, element: ET.Element, entry, **kwargs):
+        zone_widths_str = attrib(element, "zone-widths", d=None)
+        zone_widths = None
+        if zone_widths_str:
+            try:
+                zone_widths = [float(w.strip()) for w in zone_widths_str.split(",")]
+            except ValueError:
+                zone_widths = None
+
         return GradientBar(
             size=Dimension(
                 x=iattrib(element, "width", d=400),
@@ -712,10 +721,62 @@ class Widgets:
             z1_value=iattrib(element, "z1", d=120),
             z2_value=iattrib(element, "z2", d=160),
             z3_value=iattrib(element, "z3", d=200),
+            z4_value=iattrib(element, "z4", d=220),
             z0_col=rgbattr(element, "z0-rgb", d=(255, 255, 255)),
             z1_col=rgbattr(element, "z1-rgb", d=(67, 235, 52)),
             z2_col=rgbattr(element, "z2-rgb", d=(240, 232, 19)),
             z3_col=rgbattr(element, "z3-rgb", d=(207, 19, 2)),
+            z4_col=rgbattr(element, "z4-rgb", d=(139, 0, 0)),
+            mode=attrib(element, "mode", d="gradient"),
+            indicator=rgbattr(element, "indicator", d=(255, 255, 255)),
+            indicator_width=iattrib(element, "indicator-width", d=3),
+            inactive_alpha=fattrib(element, "inactive-alpha", d=1.0),
+            zone_widths=zone_widths,
+        )
+
+    @allow_attributes({"x", "y", "metric", "z1", "z2", "z3", "z4", "size", "align", "rgb", "outline", "outline_width",
+                       "zone-0-name", "zone-1-name", "zone-2-name", "zone-3-name", "zone-4-name"})
+    def create_zone_name(self, element, entry, **kwargs) -> Widget:
+        accessor = metric_accessor_from(attrib(element, "metric"))
+        z1 = iattrib(element, "z1", d=120)
+        z2 = iattrib(element, "z2", d=160)
+        z3 = iattrib(element, "z3", d=200)
+        z4 = iattrib(element, "z4", d=220)
+        zone_names = [
+            attrib(element, "zone-0-name", d="Z1"),
+            attrib(element, "zone-1-name", d="Z2"),
+            attrib(element, "zone-2-name", d="Z3"),
+            attrib(element, "zone-3-name", d="Z4"),
+            attrib(element, "zone-4-name", d="Z5"),
+        ]
+
+        def zone_value() -> str:
+            e = entry()
+            if e is None:
+                return zone_names[0]
+            v = accessor(e)
+            if v is None:
+                return zone_names[0]
+            val = v.magnitude
+            if val < z1:
+                return zone_names[0]
+            elif val < z2:
+                return zone_names[1]
+            elif val < z3:
+                return zone_names[2]
+            elif val < z4:
+                return zone_names[3]
+            else:
+                return zone_names[4]
+
+        return text(
+            at=at(element),
+            value=zone_value,
+            font=self._font(element, "size", d=16),
+            align=attrib(element, "align", d="left"),
+            fill=rgbattr(element, "rgb", d=(255, 255, 255)),
+            stroke=rgbattr(element, "outline", d=(0, 0, 0)),
+            stroke_width=iattrib(element, "outline_width", d=2),
         )
 
     @allow_attributes({"size", "metric", "units", "textsize", "vs0", "vs", "vfe", "vno", "vne", "rotate"})

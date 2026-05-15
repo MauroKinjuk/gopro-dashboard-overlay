@@ -23,7 +23,7 @@ echo Generando overlay 1080p para: %GPX_FILE%
 echo Salida: %OUTPUT_NAME%
 
 python "%PROJECT_DIR%\bin\gopro-dashboard.py" ^
-  --font "%PROJECT_DIR%\Coolvetica.otf" ^
+  --font "%PROJECT_DIR%\fonts\Inter_28pt-Bold.ttf" ^
   --use-gpx-only ^
   --gpx "%GPX_FILE%" ^
   --profile overlay-prores ^

@@ -9,5 +9,5 @@ echo Abriendo layout editor 1080p...
 
 python "%PROJECT_DIR%\bin\gopro-layout.py" ^
   "%PROJECT_DIR%\gopro_overlay\layouts\Bici_HD_1080x1920.xml" ^
-  --font "%PROJECT_DIR%\Coolvetica.otf" ^
+  --font "%PROJECT_DIR%\fonts\Inter_28pt-Bold.ttf" ^
   --overlay-size 1920x1080
