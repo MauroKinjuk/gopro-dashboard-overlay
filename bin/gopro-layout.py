@@ -15,6 +15,12 @@ project_root = script_dir.parent
 sys.path.insert(0, str(project_root))
 
 from PIL import Image
+try:
+    import tkinter as tk
+    from PIL import ImageTk
+    PREVIEW_AVAILABLE = True
+except ImportError:
+    PREVIEW_AVAILABLE = False
 from pint import DimensionalityError
 
 from gopro_overlay import fake, geo, timeseries_process
@@ -39,6 +45,40 @@ from gopro_overlay.widgets.widgets import SimpleFrameSupplier
 
 def load_frame(ffmpeg_gopro: FFMPEGGoPro, filepath: pathlib.Path, size: Dimension, at_time=timeunits(seconds=2)):
     return Image.frombytes(mode="RGBA", size=size.tuple(), data=ffmpeg_gopro.load_frame(filepath, at_time))
+
+
+class PreviewWindow:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Layout Preview")
+        self.label = tk.Label(self.root)
+        self.label.pack()
+        self.tk_image = None
+
+    def alive(self):
+        try:
+            return self.root.winfo_exists()
+        except tk.TclError:
+            return False
+
+    def show(self, image: Image.Image):
+        w, h = image.size
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        max_w = int(screen_w * 0.9)
+        max_h = int(screen_h * 0.9)
+
+        if w > max_w or h > max_h:
+            scale = min(max_w / w, max_h / h)
+            image = image.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+
+        self.tk_image = ImageTk.PhotoImage(image)
+        self.label.configure(image=self.tk_image)
+        self.root.update()
+
+    def tick(self):
+        if self.alive():
+            self.root.update()
 
 
 if __name__ == "__main__":
@@ -116,8 +156,10 @@ if __name__ == "__main__":
     ).open(args.map_style) as renderer:
 
         last_updated = None
+        preview = None
 
         while True:
+            needs_preview_update = False
             if not layout_file.exists():
                 log(f"Layout file not found: {layout_file}")
                 sleep(1)
@@ -144,6 +186,7 @@ if __name__ == "__main__":
 
                         frame.save("frame.png")
                         log("Saved Image")
+                        needs_preview_update = True
 
                     except IOError as e:
                         log(f"Unable to load {layout_file}: {e}")
@@ -155,3 +198,20 @@ if __name__ == "__main__":
                         log(f"Unable to load {layout_file}: {e}")
 
             sleep(0.1)
+
+            if PREVIEW_AVAILABLE and frame is not None:
+                if preview is None or not preview.alive():
+                    try:
+                        preview = PreviewWindow()
+                    except Exception as e:
+                        log(f"Unable to create preview: {e}")
+                        preview = None
+                if preview is not None:
+                    try:
+                        if needs_preview_update:
+                            preview.show(frame)
+                        else:
+                            preview.tick()
+                    except Exception as e:
+                        log(f"Unable to update preview: {e}")
+                        preview = None
