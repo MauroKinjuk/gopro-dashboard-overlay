@@ -424,19 +424,50 @@ class Widgets:
         self.font = font
         self.converters = converters
 
+    def _iter_framemeta(self):
+        return list(self.framemeta.items())
+
+    def _metric_bounds(self, metric_name: str, units_name: Optional[str]):
+        accessor = metric_accessor_from(metric_name)
+        converter = self.converters.converter(units_name)
+        values = []
+        for entry in self._iter_framemeta():
+            v = accessor(entry)
+            if v is not None:
+                v = converter(v)
+                if v is not None:
+                    values.append(v)
+        if values:
+            return min(values), max(values)
+        return None, None
+
     def _font(self, element, name, d):
         return self.font(iattrib(element, name, d=d, r=range(1, 2000)))
 
     @allow_attributes(
-        {"x", "y", "metric", "size", "format", "dp", "units", "align", "cache", "rgb", "outline", "outline_width"})
+        {"x", "y", "metric", "size", "format", "dp", "units", "align", "cache", "rgb", "outline", "outline_width", "stat"})
     def create_metric(self, element, entry, **kwargs) -> Widget:
+        metric_name = attrib(element, "metric")
+        units_name = attrib(element, "units", d=None)
+        stat = attrib(element, "stat", d=None)
+        accessor = metric_accessor_from(metric_name)
+        converter = self.converters.converter(units_name)
+
+        if stat in ("min", "max"):
+            bounds = self._metric_bounds(metric_name, units_name)
+            bound = bounds[0 if stat == "min" else 1]
+            if bound is not None:
+                accessor = lambda e, b=bound: b
+            else:
+                accessor = lambda e: None
+
         return metric(
             at=at(element),
             entry=entry,
-            accessor=metric_accessor_from(attrib(element, "metric")),
+            accessor=accessor,
             formatter=quantity_formatter_from(element),
             font=self._font(element, "size", d=16),
-            converter=self.converters.converter(attrib(element, "units", d=None)),
+            converter=converter,
             align=attrib(element, "align", d="left"),
             cache=battrib(element, "cache", d=True),
             fill=rgbattr(element, "rgb", d=(255, 255, 255)),
@@ -665,12 +696,37 @@ class Widgets:
     @allow_attributes({"width", "height", "metric", "units", "fill", "zero", "bar",
                        "outline", "outline-width", "h-neg", "h-pos", "max", "min", "cr"})
     def create_bar(self, element: ET.Element, entry, **kwargs) -> Widget:
+        metric_name = attrib(element, "metric")
+        units_name = attrib(element, "units", d=None)
+
+        min_attr = attrib(element, "min", d=None)
+        max_attr = attrib(element, "max", d=None)
+
+        auto_min = None
+        auto_max = None
+        if min_attr == "auto" or max_attr == "auto":
+            auto_min, auto_max = self._metric_bounds(metric_name, units_name)
+
+        if min_attr is None:
+            min_value = -20
+        elif min_attr == "auto":
+            min_value = auto_min.m if auto_min is not None else -20
+        else:
+            min_value = float(min_attr)
+
+        if max_attr is None:
+            max_value = 20
+        elif max_attr == "auto":
+            max_value = auto_max.m if auto_max is not None else 20
+        else:
+            max_value = float(max_attr)
+
         return Bar(
             size=Dimension(x=iattrib(element, "width", d=400), y=iattrib(element, "height", d=30)),
             reading=metric_value(
                 entry,
-                accessor=metric_accessor_from(attrib(element, "metric")),
-                converter=self.converters.converter(attrib(element, "units", d=None)),
+                accessor=metric_accessor_from(metric_name),
+                converter=self.converters.converter(units_name),
                 formatter=lambda q: q.m,
                 default=0
             ),
@@ -681,8 +737,8 @@ class Widgets:
             outline_width=iattrib(element, "outline-width", d=3),
             highlight_colour_negative=rgbattr(element, "h-neg", d=(255, 0, 0)),
             highlight_colour_positive=rgbattr(element, "h-pos", d=(0, 255, 0)),
-            max_value=iattrib(element, "max", d=20),
-            min_value=iattrib(element, "min", d=-20),
+            max_value=max_value,
+            min_value=min_value,
             cr=iattrib(element, "cr", d=5),
         )
 
@@ -691,6 +747,31 @@ class Widgets:
                        "z2-rgb", "z3-rgb", "z4-rgb", "mode", "indicator", "indicator-width", "inactive-alpha",
                        "zone-widths"})
     def create_zone_bar(self, element: ET.Element, entry, **kwargs):
+        metric_name = attrib(element, "metric")
+        units_name = attrib(element, "units", d=None)
+
+        min_attr = attrib(element, "min", d=None)
+        max_attr = attrib(element, "max", d=None)
+
+        auto_min = None
+        auto_max = None
+        if min_attr == "auto" or max_attr == "auto":
+            auto_min, auto_max = self._metric_bounds(metric_name, units_name)
+
+        if min_attr is None:
+            min_value = 0
+        elif min_attr == "auto":
+            min_value = auto_min.m if auto_min is not None else 0
+        else:
+            min_value = float(min_attr)
+
+        if max_attr is None:
+            max_value = 400
+        elif max_attr == "auto":
+            max_value = auto_max.m if auto_max is not None else 400
+        else:
+            max_value = float(max_attr)
+
         zone_widths_str = attrib(element, "zone-widths", d=None)
         zone_widths = None
         if zone_widths_str:
@@ -706,8 +787,8 @@ class Widgets:
             ),
             reading=metric_value(
                 entry,
-                accessor=metric_accessor_from(attrib(element, "metric")),
-                converter=self.converters.converter(attrib(element, "units", d=None)),
+                accessor=metric_accessor_from(metric_name),
+                converter=self.converters.converter(units_name),
                 formatter=lambda q: q.m,
                 default=0
             ),
@@ -716,8 +797,8 @@ class Widgets:
             outline=rgbattr(element, "outline", d=(255, 255, 255)),
             outline_width=iattrib(element, "outline-width", d=3),
             cr=iattrib(element, "cr", d=5),
-            max_value=iattrib(element, "max", d=400),
-            min_value=iattrib(element, "min", d=0),
+            max_value=max_value,
+            min_value=min_value,
             z1_value=iattrib(element, "z1", d=120),
             z2_value=iattrib(element, "z2", d=160),
             z3_value=iattrib(element, "z3", d=200),

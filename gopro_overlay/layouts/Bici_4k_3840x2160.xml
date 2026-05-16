@@ -6,14 +6,16 @@
         <frame width="1400" height="70" bg="30,33,38" cr="10" opacity="0.8" />
         <component type="elapsed" x="35" y="6" size="42" align="left" />
         <translate x="170" y="30">
-            <component type="bar" metric="odo" units="km" width="1000" height="10" min="0" max="61"
+            <component type="bar" metric="odo" units="km" width="1000" height="10" min="0" max="auto"
                 outline-width="0" bar="255,255,255" h-pos="255,255,255" fill="120,120,120" zero="0,0,0,0" cr="5" />
         </translate>
         <translate x="1250" y="10">
             <component type="metric" metric="odo" units="km" dp="1" size="35" align="right" />
         </translate>
-        <translate x="1375" y="10">
-            <component type="text" size="35" align="right" rgb="160,160,160" outline="0,0,0,0"> / 61 km</component>
+        <translate x="1280" y="10">
+            <component type="text" x="0" size="35" align="left" rgb="160,160,160" outline="0,0,0,0"> / </component>
+            <component type="metric" metric="odo" units="km" dp="1" x="35" size="35" align="left" stat="max" rgb="160,160,160" outline="0,0,0,0" />
+            <component type="text" x="115" size="35" align="left" rgb="160,160,160" outline="0,0,0,0"> km</component>
         </translate>
     </translate>
 
@@ -68,7 +70,7 @@
             <component type="metric" metric="speed" units="kph" dp="0" x="56" y="38" size="48" align="left" />
             <component type="text" x="130" y="65" size="17" align="left" rgb="249,115,22" outline="0,0,0,130">KM/H</component>
             <translate x="12" y="100">
-                <component type="bar" metric="speed" units="km/h" width="596" height="8" min="0" max="52"
+                <component type="bar" metric="speed" units="km/h" width="596" height="8" min="0" max="auto"
                     outline-width="0" bar="249,115,22" h-pos="249,115,22" fill="120,120,120" zero="0,0,0,0" cr="3" />
             </translate>
         </translate>
@@ -82,7 +84,7 @@
             <component type="metric" metric="cadence" dp="0" x="50" y="38" size="48" align="left" />
             <component type="text" x="130" y="65" size="17" align="left" rgb="167,139,250" outline="0,0,0,130">RPM</component>
             <translate x="12" y="100">
-                <component type="bar" metric="cadence" width="281" height="8" min="0" max="120"
+                <component type="bar" metric="cadence" width="281" height="8" min="0" max="auto"
                     outline-width="0" bar="167,139,250" h-pos="167,139,250" fill="120,120,120" zero="0,0,0,0" cr="3" />
             </translate>
         </translate>
@@ -96,7 +98,7 @@
             <component type="metric" metric="gradient" dp="1" x="50" y="38" size="48" align="left" />
             <component type="text" x="165" y="65" size="17" align="left" rgb="96,165,250" outline="0,0,0,130">DEG</component>
             <translate x="12" y="100">
-                <component type="bar" metric="gradient" width="281" height="8" min="-20" max="20"
+                <component type="bar" metric="gradient" width="281" height="8" min="auto" max="auto"
                     outline-width="0" bar="96,165,250" h-pos="96,165,250" fill="120,120,120" zero="0,0,0,0" cr="3" />
             </translate>
         </translate>
