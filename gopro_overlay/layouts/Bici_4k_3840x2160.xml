@@ -2,7 +2,7 @@
 <layout>
 
     <!-- Top bar centrado: Timer + Barra distancia + Valor -->
-    <translate x="1220" y="30">
+    <translate x="1220" y="50">
         <frame width="1400" height="70" bg="30,33,38" cr="10" opacity="0.8" />
         <component type="elapsed" x="35" y="6" size="42" align="left" />
         <translate x="170" y="30">
@@ -12,15 +12,15 @@
         <translate x="1250" y="10">
             <component type="metric" metric="odo" units="km" dp="1" size="35" align="right" />
         </translate>
-        <translate x="1280" y="10">
-            <component type="text" x="0" size="35" align="left" rgb="160,160,160" outline="0,0,0,0"> / </component>
+        <translate x="1250" y="10">
+            <component type="text" x="5" size="35" align="left" rgb="160,160,160" outline="0,0,0,0"> / </component>
             <component type="metric" metric="odo" units="km" dp="1" x="35" size="35" align="left" stat="max" rgb="160,160,160" outline="0,0,0,0" />
-            <component type="text" x="115" size="35" align="left" rgb="160,160,160" outline="0,0,0,0"> km</component>
+            <component type="text" x="85" size="35" align="left" rgb="160,160,160" outline="0,0,0,0"> km</component>
         </translate>
     </translate>
 
     <!-- Métricas principales - lado izquierdo -->
-    <translate x="80" y="80">
+    <translate x="85" y="55">
 
         <!-- FC Card -->
         <translate x="0" y="1510">
@@ -66,9 +66,9 @@
             <frame width="620" height="135" bg="30,33,38" cr="10" opacity="0.8" />
             <frame x="12" y="12" width="38" height="38" bg="249,115,22,255" cr="6" opacity="0.15" />
             <component type="icon" x="16" y="16" file="speedometer-variant-tool-symbol.png" size="28" />
-            <component type="text" x="56" y="14" size="17" align="left" rgb="180,180,180" outline="0,0,0,0">VELOCIDAD</component>
+            <component type="text" x="56" y="14" size="22" align="left" rgb="180,180,180" outline="0,0,0,0">VELOCIDAD</component>
             <component type="metric" metric="speed" units="kph" dp="0" x="56" y="38" size="48" align="left" />
-            <component type="text" x="130" y="65" size="17" align="left" rgb="249,115,22" outline="0,0,0,130">KM/H</component>
+            <component type="text" x="130" y="65" size="22" align="left" rgb="249,115,22" outline="0,0,0,130">KM/H</component>
             <translate x="12" y="100">
                 <component type="bar" metric="speed" units="km/h" width="596" height="8" min="0" max="auto"
                     outline-width="0" bar="249,115,22" h-pos="249,115,22" fill="120,120,120" zero="0,0,0,0" cr="3" />
@@ -80,9 +80,9 @@
             <frame width="305" height="135" bg="30,33,38" cr="10" opacity="0.8" />
             <frame x="12" y="12" width="38" height="38" bg="167,139,250,255" cr="6" opacity="0.15" />
             <component type="icon" x="16" y="16" file="gauge.png" size="28" />
-            <component type="text" x="56" y="14" size="17" align="left" rgb="180,180,180" outline="0,0,0,0">CADENCIA</component>
+            <component type="text" x="56" y="14" size="22" align="left" rgb="180,180,180" outline="0,0,0,0">CADENCIA</component>
             <component type="metric" metric="cadence" dp="0" x="50" y="38" size="48" align="left" />
-            <component type="text" x="130" y="65" size="17" align="left" rgb="167,139,250" outline="0,0,0,130">RPM</component>
+            <component type="text" x="130" y="65" size="22" align="left" rgb="167,139,250" outline="0,0,0,130">RPM</component>
             <translate x="12" y="100">
                 <component type="bar" metric="cadence" width="281" height="8" min="0" max="auto"
                     outline-width="0" bar="167,139,250" h-pos="167,139,250" fill="120,120,120" zero="0,0,0,0" cr="3" />
@@ -94,9 +94,9 @@
             <frame width="305" height="135" bg="30,33,38" cr="10" opacity="0.8" />
             <frame x="12" y="12" width="38" height="38" bg="96,165,250,255" cr="6" opacity="0.15" />
             <component type="icon" x="16" y="16" file="slope-triangle.png" size="28" />
-            <component type="text" x="56" y="14" size="17" align="left" rgb="180,180,180" outline="0,0,0,0">PENDIENTE</component>
+            <component type="text" x="56" y="14" size="22" align="left" rgb="180,180,180" outline="0,0,0,0">PENDIENTE</component>
             <component type="metric" metric="gradient" dp="1" x="50" y="38" size="48" align="left" />
-            <component type="text" x="165" y="65" size="17" align="left" rgb="96,165,250" outline="0,0,0,130">DEG</component>
+            <component type="text" x="165" y="65" size="22" align="left" rgb="96,165,250" outline="0,0,0,130">DEG</component>
             <translate x="12" y="100">
                 <component type="bar" metric="gradient" width="281" height="8" min="auto" max="auto"
                     outline-width="0" bar="96,165,250" h-pos="96,165,250" fill="120,120,120" zero="0,0,0,0" cr="3" />
@@ -107,8 +107,9 @@
 
     <!-- Mapa -->
     <translate x="3000" y="50">
-        <component type="cairo_circuit_map" size="800" fill="255,255,255" outline="0,0,0,50"
-            loc-fill="234,57,67" loc-size="0.025" rotate="0" />
+        <component type="cairo_circuit_map" size="800" fill="255,255,255" outline="0,0,0,100"
+            loc-fill="255,255,150" loc-outline="0,0,0" loc-size="0.026" rotate="0" loc-type="arrow"
+            shadow="0,0,0,100" shadow-offset="4,4" />
     </translate>
 
 </layout>

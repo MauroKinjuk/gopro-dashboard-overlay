@@ -19,10 +19,24 @@ from .widgets.cairo.reading import Reading
 from .widgets.widgets import Widget
 
 
-@allow_attributes({"size", "rotate", "fill", "outline", "line-width", "loc-fill", "loc-outline", "loc-size"})
+@allow_attributes({"size", "rotate", "fill", "outline", "line-width", "loc-fill", "loc-outline", "loc-size", "loc-type", "shadow", "shadow-offset"})
 def create_cairo_circuit_map(element, entry, timeseries, **kwargs) -> Widget:
     size = iattrib(element, "size", d=256)
     rotation = iattrib(element, "rotate", d=0)
+    loc_type = attrib(element, "loc-type", d="circle")
+
+    azimuth = None
+    if loc_type == "arrow":
+        def get_azimuth():
+            e = entry()
+            if e is None or e.cog is None:
+                return None
+            return e.cog.to("degree").magnitude
+        azimuth = get_azimuth
+
+    shadow = rgbattr(element, "shadow", d=None)
+    shadow_offset_raw = attrib(element, "shadow-offset", d="4,4")
+    shadow_offset = tuple(int(x.strip()) for x in shadow_offset_raw.split(","))
 
     return CairoAdapter(
         size=Dimension(size, size),
@@ -38,9 +52,12 @@ def create_cairo_circuit_map(element, entry, timeseries, **kwargs) -> Widget:
                 fill=rgbattr(element, "loc-fill", d=(0, 0, 255)),
                 outline=rgbattr(element, "loc-outline", d=(0, 0, 0)),
                 width=fattrib(element, "loc-size", d=0.01 * 1.1)
-            )
+            ),
+            azimuth=azimuth,
         ),
         rotation=rotation,
+        shadow=shadow,
+        shadow_offset=shadow_offset[:2] if shadow_offset else (4, 4),
     )
 
 

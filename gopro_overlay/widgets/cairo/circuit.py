@@ -1,6 +1,6 @@
 import dataclasses
 import math
-from typing import Callable, Tuple
+from typing import Callable, Optional, Tuple
 
 import cairo
 
@@ -25,9 +25,9 @@ blue = (0, 0, 255)
 
 def to_cairo_rgba(pillow_rgba):
     if len(pillow_rgba) == 3:
-        return pillow_rgba
+        return tuple(c / 255.0 for c in pillow_rgba)
     elif len(pillow_rgba) == 4:
-        return pillow_rgba[0], pillow_rgba[1], pillow_rgba[2], pillow_rgba[3] / 255.0
+        return pillow_rgba[0] / 255.0, pillow_rgba[1] / 255.0, pillow_rgba[2] / 255.0, pillow_rgba[3] / 255.0
     else:
         raise ValueError("Only 3 or 4 tuples, please")
 
@@ -73,20 +73,41 @@ class CairoCircuitLocation(CairoWidget):
             location_fn: Callable[[], Point],
             scale_fn: Callable[[Point], Tuple[float, float]],
             loc: Line = Line(fill=white, outline=black, width=0.01),
+            azimuth: Callable[[], Optional[float]] = None,
     ):
         self.location = location_fn
         self.scale = scale_fn
         self.loc = loc
+        self.azimuth = azimuth
 
     def draw(self, context: cairo.Context):
         with saved(context):
-            context.set_line_width(self.loc.width)
             context.translate(*(self.scale(self.location())))
-            context.arc(0, 0, self.loc.width, 0, math.tau)
-            set_source(context, to_cairo_rgba(self.loc.outline))
-            context.stroke_preserve()
-            set_source(context, to_cairo_rgba(self.loc.fill))
-            context.fill()
+
+            if self.azimuth is not None:
+                azi = self.azimuth()
+                if azi is not None:
+                    context.rotate(math.radians(azi))
+
+                s = self.loc.width
+                # Arrow pointing right (0 degrees in Cairo)
+                context.move_to(s, 0)
+                context.line_to(-s / 2, -s / 2)
+                context.line_to(-s / 2, s / 2)
+                context.close_path()
+
+                set_source(context, to_cairo_rgba(self.loc.fill))
+                context.fill_preserve()
+                set_source(context, to_cairo_rgba(self.loc.outline))
+                context.set_line_width(s * 0.15)
+                context.stroke()
+            else:
+                context.set_line_width(self.loc.width)
+                context.arc(0, 0, self.loc.width, 0, math.tau)
+                set_source(context, to_cairo_rgba(self.loc.outline))
+                context.stroke_preserve()
+                set_source(context, to_cairo_rgba(self.loc.fill))
+                context.fill()
 
 
 class CairoCircuit(CairoWidget):
@@ -97,6 +118,7 @@ class CairoCircuit(CairoWidget):
             location: Callable[[], Point],
             line: Line = Line(fill=white, outline=black, width=0.01),
             loc: Line = Line(fill=blue, outline=white, width=0.015),
+            azimuth: Callable[[], Optional[float]] = None,
     ):
         self.framemeta = framemeta
         self._journey = None
@@ -115,6 +137,7 @@ class CairoCircuit(CairoWidget):
                 location,
                 self.scale,
                 loc,
+                azimuth=azimuth,
             )
         ])
 

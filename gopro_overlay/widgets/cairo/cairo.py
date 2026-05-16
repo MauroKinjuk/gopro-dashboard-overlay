@@ -89,10 +89,12 @@ def to_pillow(surface: cairo.ImageSurface) -> Image:
 
 class CairoAdapter(Widget):
 
-    def __init__(self, size: Dimension, widget: CairoWidget, rotation=0):
+    def __init__(self, size: Dimension, widget: CairoWidget, rotation=0, shadow=None, shadow_offset=(4, 4)):
         self.size = size
         self.rotation = rotation
         self.widget = widget
+        self.shadow = shadow
+        self.shadow_offset = shadow_offset
 
     def draw(self, image: Image, draw: ImageDraw):
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.size.x, self.size.y)
@@ -111,7 +113,15 @@ class CairoAdapter(Widget):
 
         self.widget.draw(ctx)
 
-        image.alpha_composite(to_pillow(surface), (0, 0))
+        pillow = to_pillow(surface)
+
+        if self.shadow is not None:
+            shadow_img = Image.new("RGBA", (self.size.x, self.size.y), (0, 0, 0, 0))
+            alpha = pillow.split()[3]
+            shadow_img.paste(self.shadow, (self.shadow_offset[0], self.shadow_offset[1]), alpha)
+            image.alpha_composite(shadow_img, (0, 0))
+
+        image.alpha_composite(pillow, (0, 0))
 
 
 def set_source(context: cairo.Context, colour: Tuple):

@@ -680,7 +680,7 @@ class Widgets:
             text=rgbattr(element, "text", d=(255, 255, 255)),
         )
 
-    @allow_attributes({"size", "textsize", "arrow", "bg", "text", "outline", "arrow-outline"})
+    @allow_attributes({"size", "textsize", "arrow", "bg", "text", "outline", "arrow-outline", "arrow-length"})
     def create_compass_arrow(self, element: ET.Element, entry, **kwargs) -> Widget:
         return CompassArrow(
             size=iattrib(element, "size", d=256),
@@ -691,6 +691,7 @@ class Widgets:
             text=rgbattr(element, "text", d=(255, 255, 255)),
             outline=rgbattr(element, "outline", d=(0, 0, 0)),
             arrow_outline=rgbattr(element, "arrow-outline", d=(0, 0, 0)),
+            arrow_length=fattrib(element, "arrow-length", d=0.55),
         )
 
     @allow_attributes({"width", "height", "metric", "units", "fill", "zero", "bar",
@@ -720,6 +721,9 @@ class Widgets:
             max_value = auto_max.m if auto_max is not None else 20
         else:
             max_value = float(max_attr)
+
+        if min_value == max_value:
+            max_value = min_value + 1.0
 
         return Bar(
             size=Dimension(x=iattrib(element, "width", d=400), y=iattrib(element, "height", d=30)),
@@ -771,6 +775,9 @@ class Widgets:
             max_value = auto_max.m if auto_max is not None else 400
         else:
             max_value = float(max_attr)
+
+        if min_value == max_value:
+            max_value = min_value + 1.0
 
         zone_widths_str = attrib(element, "zone-widths", d=None)
         zone_widths = None

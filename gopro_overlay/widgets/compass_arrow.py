@@ -13,7 +13,8 @@ class CompassArrow(Widget):
                  bg=(0, 0, 0, 0),
                  text=(255, 255, 255),
                  outline=(0, 0, 0),
-                 arrow_outline=(0, 0, 0)
+                 arrow_outline=(0, 0, 0),
+                 arrow_length=0.9
                  ):
         self.reading = reading
         self.size = size
@@ -23,6 +24,7 @@ class CompassArrow(Widget):
         self.bg = bg
         self.text = text
         self.outline = outline
+        self.arrow_length = arrow_length
         self.last_reading = None
         self.image = None
 
@@ -53,12 +55,19 @@ class CompassArrow(Widget):
 
         locate = functools.partial(Compass.locate, radius, centre, -reading)
 
+        # arrow_length: 0=center, 1.0=edge (how far from center the tip is)
+        tip_d = radius * (1.0 - self.arrow_length)
+        # Base stays fixed near center (10% from center)
+        base_d = radius * 0.9
+        # Width: proportional to arrow length, with a minimum
+        width = max(radius * 0.85, radius * (1.0 - self.arrow_length * 0.5))
+
         draw.polygon(
             [
-                locate(0, radius * 0.45),
-                locate(-90, (radius * 0.9)),
-                locate(0, (radius * 0.9)),
-                locate(90, (radius * 0.9)),
+                locate(0, tip_d),
+                locate(-90, width),
+                locate(0, base_d),
+                locate(90, width),
             ],
             fill=self.arrow,
             outline=self.arrow_outline,
