@@ -23,7 +23,7 @@
     <translate x="85" y="55">
 
         <!-- FC Card -->
-        <translate x="0" y="1510">
+        <translate x="0" y="1345">
             <frame width="620" height="220" bg="30,33,38" cr="10" opacity="0.8" />
             <!-- Fondo del icono -->
             <frame x="14" y="14" width="42" height="42" bg="234,57,67,255" cr="8" opacity="0.15" />
@@ -62,7 +62,7 @@
         </translate>
 
         <!-- Speed Card (abajo, ancho grande) -->
-        <translate x="0" y="1885">
+        <translate x="0" y="1575">
             <frame width="620" height="135" bg="30,33,38" cr="10" opacity="0.8" />
             <frame x="12" y="12" width="38" height="38" bg="249,115,22,255" cr="6" opacity="0.15" />
             <component type="icon" x="16" y="16" file="speedometer-variant-tool-symbol.png" size="28" />
@@ -76,7 +76,7 @@
         </translate>
 
         <!-- Cadence Card -->
-        <translate x="315" y="1740">
+        <translate x="315" y="1720">
             <frame width="305" height="135" bg="30,33,38" cr="10" opacity="0.8" />
             <frame x="12" y="12" width="38" height="38" bg="167,139,250,255" cr="6" opacity="0.15" />
             <component type="icon" x="16" y="16" file="gauge.png" size="28" />
@@ -90,7 +90,7 @@
         </translate>
 
         <!-- Gradient Card (arriba, ancho chico) -->
-        <translate x="0" y="1740">
+        <translate x="0" y="1720">
             <frame width="305" height="135" bg="30,33,38" cr="10" opacity="0.8" />
             <frame x="12" y="12" width="38" height="38" bg="96,165,250,255" cr="6" opacity="0.15" />
             <component type="icon" x="16" y="16" file="slope-triangle.png" size="28" />
@@ -100,6 +100,21 @@
             <translate x="12" y="100">
                 <component type="bar" metric="gradient" width="281" height="8" min="auto" max="auto"
                     outline-width="0" bar="96,165,250" h-pos="96,165,250" fill="120,120,120" zero="0,0,0,0" cr="3" />
+            </translate>
+        </translate>
+
+        <!-- Perfil de Elevación -->
+        <translate x="0" y="1865">
+            <frame width="620" height="155" bg="30,33,38" cr="10" opacity="0.8" />
+            <translate x="10" y="10">
+                <component type="chart" metric="alt" units="metres" width="600" height="100"
+                    seconds="300" filled="true" bg="30,33,38,0" fill="96,165,250,150"
+                    line="255,255,255" text="255,255,255" marker-size="7" samples="100" />
+            </translate>
+            <translate x="10" y="118">
+                <component type="text" size="22" align="left" rgb="180,180,180" outline="0,0,0,0">ELEVACIÓN</component>
+                <component type="metric" metric="alt" units="metres" dp="0" x="140" y="-2" size="24" align="left" />
+                <component type="text" x="180" y="0" size="22" align="left" rgb="96,165,250" outline="0,0,0,0">m</component>
             </translate>
         </translate>
 
