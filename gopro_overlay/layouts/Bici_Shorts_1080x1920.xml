@@ -3,19 +3,19 @@
 
     <!-- Top bar centrado: Timer + Barra distancia + Valor -->
     <translate x="50" y="30">
-        <frame width="980" height="45" bg="30,33,38" cr="10" opacity="0.8" />
-        <component type="elapsed" x="20" y="4" size="26" align="left" />
-        <translate x="140" y="18">
+        <frame width="990" height="45" bg="30,33,38" cr="10" opacity="0.8" />
+        <component type="elapsed" x="30" y="4" size="26" align="left" />
+        <translate x="130" y="18">
             <component type="bar" metric="odo" units="km" width="700" height="6" min="0" max="auto"
                 outline-width="0" bar="255,255,255" h-pos="255,255,255" fill="120,120,120" zero="0,0,0,0" cr="3" />
         </translate>
-        <translate x="870" y="6">
+        <translate x="880" y="6">
             <component type="metric" metric="odo" units="km" dp="1" size="22" align="right" />
         </translate>
-        <translate x="870" y="6">
+        <translate x="880" y="6">
             <component type="text" x="0" size="22" align="left" rgb="160,160,160" outline="0,0,0,0"> / </component>
             <component type="metric" metric="odo" units="km" dp="1" x="22" size="22" align="left" stat="max" rgb="160,160,160" outline="0,0,0,0" />
-            <component type="text" x="75" size="22" align="left" rgb="160,160,160" outline="0,0,0,0"> km</component>
+            <component type="text" x="60" size="22" align="left" rgb="160,160,160" outline="0,0,0,0"> km</component>
         </translate>
     </translate>
 
@@ -23,8 +23,8 @@
     <translate x="50" y="1450">
 
         <!-- FC Card (ancho completo) -->
-        <translate x="0" y="0">
-            <frame width="980" height="170" bg="30,33,38" cr="10" opacity="0.8" />
+        <translate x="0" y="30">
+            <frame width="980" height="140" bg="30,33,38" cr="10" opacity="0.8" />
             <!-- Fondo del icono -->
             <frame x="12" y="12" width="32" height="32" bg="234,57,67,255" cr="6" opacity="0.15" />
             <component type="icon" x="14" y="14" file="heartbeat.png" size="26" />
@@ -33,17 +33,17 @@
             <!-- Valor FC -->
             <component type="metric" metric="hr" dp="0" x="42" y="28" size="48" align="left" />
             <!-- Unidad BPM -->
-            <component type="text" x="110" y="48" size="18" align="left" rgb="234,57,67" outline="0,0,0,130">BPM</component>
+            <component type="text" x="150" y="48" size="18" align="left" rgb="234,57,67" outline="0,0,0,130">BPM</component>
             <!-- Zona dinámica -->
             <translate x="900" y="10">
                 <component type="zone_name" metric="hr" z1="118" z2="137" z3="157" z4="176"
                     zone-0-name="Z1" zone-1-name="Z2" zone-2-name="Z3" zone-3-name="Z4" zone-4-name="Z5"
-                    size="18" align="right" rgb="255,255,255" outline="0,0,0,130" />
+                    size="22" align="right" rgb="255,255,255" outline="0,0,0,130" />
             </translate>
-            <translate x="920" y="32">
+            <translate x="910" y="32">
                 <component type="zone_name" metric="hr" z1="118" z2="137" z3="157" z4="176"
                     zone-0-name="Rec." zone-1-name="Aeróbico" zone-2-name="Umbral" zone-3-name="Anaeróbico" zone-4-name="VO2"
-                    size="14" align="right" rgb="200,200,200" outline="0,0,0,130" />
+                    size="22" align="right" rgb="200,200,200" outline="0,0,0,130" />
             </translate>
             <!-- Zone bar -->
             <translate x="12" y="85">
@@ -68,7 +68,7 @@
             <component type="icon" x="14" y="14" file="speedometer-variant-tool-symbol.png" size="22" />
             <component type="text" x="46" y="10" size="14" align="left" rgb="180,180,180" outline="0,0,0,0">VELOCIDAD</component>
             <component type="metric" metric="speed" units="kph" dp="0" x="46" y="28" size="36" align="left" />
-            <component type="text" x="100" y="42" size="14" align="left" rgb="249,115,22" outline="0,0,0,130">KM/H</component>
+            <component type="text" x="115" y="42" size="14" align="left" rgb="249,115,22" outline="0,0,0,130">KM/H</component>
             <translate x="12" y="72">
                 <component type="bar" metric="speed" units="km/h" width="956" height="6" min="0" max="auto"
                     outline-width="0" bar="249,115,22" h-pos="249,115,22" fill="120,120,120" zero="0,0,0,0" cr="3" />
@@ -83,7 +83,7 @@
             <component type="icon" x="14" y="14" file="slope-triangle.png" size="22" />
             <component type="text" x="46" y="10" size="14" align="left" rgb="180,180,180" outline="0,0,0,0">PENDIENTE</component>
             <component type="metric" metric="gradient" dp="1" x="46" y="28" size="36" align="left" />
-            <component type="text" x="100" y="42" size="14" align="left" rgb="96,165,250" outline="0,0,0,130">DEG</component>
+            <component type="text" x="140" y="42" size="14" align="left" rgb="96,165,250" outline="0,0,0,130">DEG</component>
             <translate x="12" y="72">
                 <component type="bar" metric="gradient" width="456" height="6" min="auto" max="auto"
                     outline-width="0" bar="96,165,250" h-pos="96,165,250" fill="120,120,120" zero="0,0,0,0" cr="3" />
@@ -97,7 +97,7 @@
             <component type="icon" x="14" y="14" file="gauge.png" size="22" />
             <component type="text" x="46" y="10" size="14" align="left" rgb="180,180,180" outline="0,0,0,0">CADENCIA</component>
             <component type="metric" metric="cadence" dp="0" x="46" y="28" size="36" align="left" />
-            <component type="text" x="100" y="42" size="14" align="left" rgb="167,139,250" outline="0,0,0,130">RPM</component>
+            <component type="text" x="120" y="42" size="14" align="left" rgb="167,139,250" outline="0,0,0,130">RPM</component>
             <translate x="12" y="72">
                 <component type="bar" metric="cadence" width="456" height="6" min="0" max="auto"
                     outline-width="0" bar="167,139,250" h-pos="167,139,250" fill="120,120,120" zero="0,0,0,0" cr="3" />
