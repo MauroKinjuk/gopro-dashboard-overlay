@@ -747,8 +747,9 @@ class Widgets:
         )
 
     @allow_attributes({"width", "height", "metric", "units", "fill", "zone-divider", "outline",
-                       "outline-width", "cr", "max", "min", "z1", "z2", "z3", "z4", "z0-rgb", "z1-rgb",
-                       "z2-rgb", "z3-rgb", "z4-rgb", "mode", "indicator", "indicator-width", "inactive-alpha",
+                       "outline-width", "cr", "max", "min", "z1", "z2", "z3", "z4", "z5", "z6",
+                       "z0-rgb", "z1-rgb", "z2-rgb", "z3-rgb", "z4-rgb", "z5-rgb", "z6-rgb",
+                       "mode", "indicator", "indicator-width", "inactive-alpha",
                        "zone-widths"})
     def create_zone_bar(self, element: ET.Element, entry, **kwargs):
         metric_name = attrib(element, "metric")
@@ -810,11 +811,15 @@ class Widgets:
             z2_value=iattrib(element, "z2", d=160),
             z3_value=iattrib(element, "z3", d=200),
             z4_value=iattrib(element, "z4", d=220),
+            z5_value=iattrib(element, "z5", d=None),
+            z6_value=iattrib(element, "z6", d=None),
             z0_col=rgbattr(element, "z0-rgb", d=(255, 255, 255)),
             z1_col=rgbattr(element, "z1-rgb", d=(67, 235, 52)),
             z2_col=rgbattr(element, "z2-rgb", d=(240, 232, 19)),
             z3_col=rgbattr(element, "z3-rgb", d=(207, 19, 2)),
             z4_col=rgbattr(element, "z4-rgb", d=(139, 0, 0)),
+            z5_col=rgbattr(element, "z5-rgb", d=(100, 0, 0)),
+            z6_col=rgbattr(element, "z6-rgb", d=(60, 0, 40)),
             mode=attrib(element, "mode", d="gradient"),
             indicator=rgbattr(element, "indicator", d=(255, 255, 255)),
             indicator_width=iattrib(element, "indicator-width", d=3),
@@ -822,20 +827,23 @@ class Widgets:
             zone_widths=zone_widths,
         )
 
-    @allow_attributes({"x", "y", "metric", "z1", "z2", "z3", "z4", "size", "align", "rgb", "outline", "outline_width",
-                       "zone-0-name", "zone-1-name", "zone-2-name", "zone-3-name", "zone-4-name"})
+    @allow_attributes({"x", "y", "metric", "z1", "z2", "z3", "z4", "z5", "z6", "size", "align", "rgb", "outline",
+                       "outline_width",
+                       "zone-0-name", "zone-1-name", "zone-2-name", "zone-3-name", "zone-4-name",
+                       "zone-5-name", "zone-6-name"})
     def create_zone_name(self, element, entry, **kwargs) -> Widget:
         accessor = metric_accessor_from(attrib(element, "metric"))
-        z1 = iattrib(element, "z1", d=120)
-        z2 = iattrib(element, "z2", d=160)
-        z3 = iattrib(element, "z3", d=200)
-        z4 = iattrib(element, "z4", d=220)
+        z_values = [
+            iattrib(element, "z1", d=120),
+            iattrib(element, "z2", d=160),
+            iattrib(element, "z3", d=200),
+            iattrib(element, "z4", d=220),
+        ]
+        for extra in (iattrib(element, "z5", d=None), iattrib(element, "z6", d=None)):
+            if extra is not None:
+                z_values.append(extra)
         zone_names = [
-            attrib(element, "zone-0-name", d="Z1"),
-            attrib(element, "zone-1-name", d="Z2"),
-            attrib(element, "zone-2-name", d="Z3"),
-            attrib(element, "zone-3-name", d="Z4"),
-            attrib(element, "zone-4-name", d="Z5"),
+            attrib(element, f"zone-{i}-name", d=f"Z{i + 1}") for i in range(len(z_values) + 1)
         ]
 
         def zone_value() -> str:
@@ -846,16 +854,10 @@ class Widgets:
             if v is None:
                 return zone_names[0]
             val = v.magnitude
-            if val < z1:
-                return zone_names[0]
-            elif val < z2:
-                return zone_names[1]
-            elif val < z3:
-                return zone_names[2]
-            elif val < z4:
-                return zone_names[3]
-            else:
-                return zone_names[4]
+            for i, z in enumerate(z_values):
+                if val < z:
+                    return zone_names[i]
+            return zone_names[-1]
 
         return text(
             at=at(element),

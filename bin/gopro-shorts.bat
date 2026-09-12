@@ -26,7 +26,7 @@ python "%PROJECT_DIR%\bin\gopro-dashboard.py" ^
   --font "%PROJECT_DIR%\Coolvetica.otf" ^
   --use-gpx-only ^
   --gpx "%GPX_FILE%" ^
-  --profile overlay-prores ^
+  --profile overlay-capcut ^
   --overlay-size 1080x1920 ^
   "%OUTPUT_NAME%" ^
   --units-speed kph ^

@@ -23,7 +23,7 @@
     <translate x="40" y="40">
 
         <!-- FC Card -->
-        <translate x="0" y="755">
+        <translate x="0" y="662">
             <frame width="310" height="110" bg="30,33,38" cr="10" opacity="0.8" />
             <!-- Fondo del icono -->
             <frame x="7" y="7" width="21" height="21" bg="234,57,67,255" cr="4" opacity="0.15" />
@@ -59,6 +59,47 @@
             <component type="text" x="155" y="68" size="10" align="centre" rgb="224,120,32" outline="0,0,0,0">Z3</component>
             <component type="text" x="220" y="68" size="10" align="centre" rgb="214,53,53" outline="0,0,0,0">Z4</component>
             <component type="text" x="277" y="68" size="10" align="centre" rgb="180,30,30" outline="0,0,0,0">Z5</component>
+        </translate>
+
+        <!-- Power Card (zonas Coggan para FTP=200W: z1..z6 = 55% 75% 90% 105% 120% 150%, max=200%) -->
+        <translate x="0" y="777">
+            <frame width="310" height="88" bg="30,33,38" cr="10" opacity="0.8" />
+            <!-- Fondo del icono -->
+            <frame x="7" y="7" width="21" height="21" bg="250,204,21,255" cr="4" opacity="0.15" />
+            <component type="icon" x="9" y="9" file="power.png" size="17" />
+            <!-- Label Potencia -->
+            <component type="text" x="33" y="8" size="11" align="left" rgb="180,180,180" outline="0,0,0,0">POTENCIA</component>
+            <!-- Valor Potencia -->
+            <component type="metric" metric="power" dp="0" x="27" y="18" size="30" align="left" />
+            <!-- Unidad W -->
+            <component type="text" x="100" y="31" size="12" align="left" rgb="250,204,21" outline="0,0,0,130">W</component>
+            <!-- Zona dinámica -->
+            <translate x="290" y="7">
+                <component type="zone_name" metric="power" z1="110" z2="150" z3="180" z4="210" z5="240" z6="300"
+                    zone-0-name="Z1" zone-1-name="Z2" zone-2-name="Z3" zone-3-name="Z4" zone-4-name="Z5" zone-5-name="Z6" zone-6-name="Z7"
+                    size="13" align="right" rgb="255,255,255" outline="0,0,0,130" />
+            </translate>
+            <translate x="297" y="22">
+                <component type="zone_name" metric="power" z1="110" z2="150" z3="180" z4="210" z5="240" z6="300"
+                    zone-0-name="Rec." zone-1-name="Resist." zone-2-name="Tempo" zone-3-name="Umbral" zone-4-name="VO2" zone-5-name="Anaer." zone-6-name="Sprint"
+                    size="11" align="right" rgb="200,200,200" outline="0,0,0,130" />
+            </translate>
+            <!-- Zone bar -->
+            <translate x="6" y="55">
+                <component type="zone-bar" metric="power" min="0" max="400" z1="110" z2="150" z3="180" z4="210" z5="240" z6="300"
+                    z0-rgb="26,158,92" z1-rgb="128,185,60" z2-rgb="232,194,32" z3-rgb="224,120,32" z4-rgb="214,53,53" z5-rgb="180,30,30" z6-rgb="120,20,60"
+                    zone-divider="255,255,255" outline="0,0,0,0" width="297" height="10"
+                    mode="solid" indicator="255,255,255" indicator-width="4" inactive-alpha="0.3"
+                    outline-width="0" />
+            </translate>
+            <!-- Labels Z1-Z7 -->
+            <component type="text" x="41" y="68" size="10" align="centre" rgb="26,158,92" outline="0,0,0,0">Z1</component>
+            <component type="text" x="96" y="68" size="10" align="centre" rgb="128,185,60" outline="0,0,0,0">Z2</component>
+            <component type="text" x="123" y="68" size="10" align="centre" rgb="232,194,32" outline="0,0,0,0">Z3</component>
+            <component type="text" x="145" y="68" size="10" align="centre" rgb="224,120,32" outline="0,0,0,0">Z4</component>
+            <component type="text" x="167" y="68" size="10" align="centre" rgb="214,53,53" outline="0,0,0,0">Z5</component>
+            <component type="text" x="200" y="68" size="10" align="centre" rgb="180,30,30" outline="0,0,0,0">Z6</component>
+            <component type="text" x="260" y="68" size="10" align="centre" rgb="120,20,60" outline="0,0,0,0">Z7</component>
         </translate>
 
         <!-- Gradient Card (arriba, ancho chico) -->

@@ -66,6 +66,7 @@ def fake_framemeta(length: datetime.timedelta = datetime.timedelta(seconds=20),
     cad = Random1D(50, rng=rng)
     grad = Random1D(23, rng=rng)
     hr = Random1D(100, rng=rng)
+    power = Random1D(180, rng=rng)
     alt = Random1D(1000, rng=rng)
     temp = Random1D(27, rng=rng)
 
@@ -118,6 +119,8 @@ def fake_framemeta(length: datetime.timedelta = datetime.timedelta(seconds=20),
 
                 gpsfix=GPSFix.LOCK_2D.value,
                 gpslock=units.Quantity(GPSFix.LOCK_2D.value),
+
+                power=units.Quantity(power.step(), units.watt),
             )
         )
         current_dt = current_dt + step

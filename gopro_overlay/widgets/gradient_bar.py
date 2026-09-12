@@ -7,7 +7,8 @@ from .widgets import Widget
 
 class GradientBar(Widget):
 
-    def __init__(self, size, reading, min_value=0, max_value=1000, z1_value=120, z2_value=150, z3_value=180, z4_value=200, cr=5,
+    def __init__(self, size, reading, min_value=0, max_value=1000, z1_value=120, z2_value=150, z3_value=180, z4_value=200,
+                 z5_value=None, z6_value=None, cr=5,
                  fill=(255, 255, 255, 0),
                  outline=(255, 255, 255),
                  outline_width=3,
@@ -16,6 +17,8 @@ class GradientBar(Widget):
                  z2_col=(240, 232, 19),
                  z3_col=(207, 19, 2),
                  z4_col=(139, 0, 0),
+                 z5_col=(100, 0, 0),
+                 z6_col=(60, 0, 40),
                  divider=(255, 255, 255),
                  mode="gradient",
                  indicator=(255, 255, 255),
@@ -48,6 +51,13 @@ class GradientBar(Widget):
         self.z3_col = z3_col
         self.z4_col = z4_col
 
+        self.zone_thresholds = [z1_value, z2_value, z3_value, z4_value]
+        self.zone_cols = [z0_col, z1_col, z2_col, z3_col, z4_col]
+        for zv, zc in ((z5_value, z5_col), (z6_value, z6_col)):
+            if zv is not None:
+                self.zone_thresholds.append(zv)
+                self.zone_cols.append(zc)
+
     def x_coord(self, value):
         value = max(min(value, self.max_value), self.min_value)
         scale = self.scale
@@ -66,13 +76,8 @@ class GradientBar(Widget):
         return shifted + self.min_value
 
     def _zone_ranges(self):
-        return [
-            (self.min_value, self.z1_value),
-            (self.z1_value, self.z2_value),
-            (self.z2_value, self.z3_value),
-            (self.z3_value, self.z4_value),
-            (self.z4_value, self.max_value),
-        ]
+        bounds = [self.min_value] + self.zone_thresholds + [self.max_value]
+        return list(zip(bounds, bounds[1:]))
 
     def _visual_zone_widths(self):
         if not self.zone_widths:
@@ -112,28 +117,15 @@ class GradientBar(Widget):
     # TODO: REFACTOR
     def get_color(self, x_coord):
         value = self.value(x_coord)
-        if value < self.z1_value:
-            range = self.x_coord(self.z1_value) - self.x_coord(self.min_value)
-            i = x_coord - self.x_coord(self.min_value)
-            gradient_step = [(t - f) / range for f, t in zip(self.z0_col, self.z1_col)]
-            return [round(f + gs * i) for f, gs in zip(self.z0_col, gradient_step)]
-        elif value < self.z2_value:
-            range = self.x_coord(self.z2_value) - self.x_coord(self.z1_value)
-            i = x_coord - self.x_coord(self.z1_value)
-            gradient_step = [(t - f) / range for f, t in zip(self.z1_col, self.z2_col)]
-            return [round(f + gs * i) for f, gs in zip(self.z1_col, gradient_step)]
-        elif value < self.z3_value:
-            range = self.x_coord(self.z3_value) - self.x_coord(self.z2_value)
-            i = x_coord - self.x_coord(self.z2_value)
-            gradient_step = [(t - f) / range for f, t in zip(self.z2_col, self.z3_col)]
-            return [round(f + gs * i) for f, gs in zip(self.z2_col, gradient_step)]
-        elif value < self.z4_value:
-            range = self.x_coord(self.z4_value) - self.x_coord(self.z3_value)
-            i = x_coord - self.x_coord(self.z3_value)
-            gradient_step = [(t - f) / range for f, t in zip(self.z3_col, self.z4_col)]
-            return [round(f + gs * i) for f, gs in zip(self.z3_col, gradient_step)]
-        else:
-            return self.z4_col
+        ranges = self._zone_ranges()
+        for i, (z_min, z_max) in enumerate(ranges):
+            if value < z_max or i == len(ranges) - 1:
+                if i == len(ranges) - 1:
+                    return self.zone_cols[i]
+                span = self.x_coord(z_max) - self.x_coord(z_min)
+                offset = x_coord - self.x_coord(z_min)
+                gradient_step = [(t - f) / span for f, t in zip(self.zone_cols[i], self.zone_cols[i + 1])]
+                return [round(f + gs * offset) for f, gs in zip(self.zone_cols[i], gradient_step)]
 
     def draw(self, image: Image, draw: ImageDraw):
         current = self.reading()
@@ -166,11 +158,8 @@ class GradientBar(Widget):
 
         if self.mode == "solid":
             zones = [
-                (self.min_value, self.z1_value, self.z0_col),
-                (self.z1_value, self.z2_value, self.z1_col),
-                (self.z2_value, self.z3_value, self.z2_col),
-                (self.z3_value, self.z4_value, self.z3_col),
-                (self.z4_value, self.max_value, self.z4_col),
+                (z_min, z_max, self.zone_cols[i])
+                for i, (z_min, z_max) in enumerate(self._zone_ranges())
             ]
             zone_coords = self._visual_zone_coords()
             current_x = round(self._visual_x_for_value(current))
@@ -209,7 +198,7 @@ class GradientBar(Widget):
                 draw.line(((i, self.line_width), (i, self.size.y - self.line_width - 1)), tuple(self.get_color(i)), width=1)
 
         if self.divider:
-            for v in (self.z1_value, self.z2_value, self.z3_value, self.z4_value):
+            for v in self.zone_thresholds:
                 x_div = round(self._visual_x_for_value(v))
                 if self.line_width <= x_div <= self.size.x - self.line_width - 1:
                     draw.line(

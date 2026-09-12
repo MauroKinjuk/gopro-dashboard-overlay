@@ -20,7 +20,7 @@
     </translate>
 
     <!-- Métricas principales - apiladas abajo para formato vertical -->
-    <translate x="50" y="1450">
+    <translate x="50" y="1300">
 
         <!-- FC Card (ancho completo) -->
         <translate x="0" y="30">
@@ -61,8 +61,49 @@
             <component type="text" x="905" y="106" size="14" align="centre" rgb="180,30,30" outline="0,0,0,0">Z5</component>
         </translate>
 
-        <!-- Speed Card (ancho completo, debajo de FC) -->
+        <!-- Power Card (ancho completo, zonas Coggan para FTP=200W: z1..z6 = 55% 75% 90% 105% 120% 150%, max=200%) -->
         <translate x="0" y="180">
+            <frame width="980" height="140" bg="30,33,38" cr="10" opacity="0.8" />
+            <!-- Fondo del icono -->
+            <frame x="12" y="12" width="32" height="32" bg="250,204,21,255" cr="6" opacity="0.15" />
+            <component type="icon" x="14" y="14" file="power.png" size="26" />
+            <!-- Label Potencia -->
+            <component type="text" x="50" y="12" size="16" align="left" rgb="180,180,180" outline="0,0,0,0">POTENCIA</component>
+            <!-- Valor Potencia -->
+            <component type="metric" metric="power" dp="0" x="42" y="28" size="48" align="left" />
+            <!-- Unidad W -->
+            <component type="text" x="170" y="48" size="18" align="left" rgb="250,204,21" outline="0,0,0,130">W</component>
+            <!-- Zona dinámica -->
+            <translate x="900" y="10">
+                <component type="zone_name" metric="power" z1="110" z2="150" z3="180" z4="210" z5="240" z6="300"
+                    zone-0-name="Z1" zone-1-name="Z2" zone-2-name="Z3" zone-3-name="Z4" zone-4-name="Z5" zone-5-name="Z6" zone-6-name="Z7"
+                    size="22" align="right" rgb="255,255,255" outline="0,0,0,130" />
+            </translate>
+            <translate x="910" y="32">
+                <component type="zone_name" metric="power" z1="110" z2="150" z3="180" z4="210" z5="240" z6="300"
+                    zone-0-name="Rec." zone-1-name="Resist." zone-2-name="Tempo" zone-3-name="Umbral" zone-4-name="VO2" zone-5-name="Anaer." zone-6-name="Sprint"
+                    size="22" align="right" rgb="200,200,200" outline="0,0,0,130" />
+            </translate>
+            <!-- Zone bar -->
+            <translate x="12" y="85">
+                <component type="zone-bar" metric="power" min="0" max="400" z1="110" z2="150" z3="180" z4="210" z5="240" z6="300"
+                    z0-rgb="26,158,92" z1-rgb="128,185,60" z2-rgb="232,194,32" z3-rgb="224,120,32" z4-rgb="214,53,53" z5-rgb="180,30,30" z6-rgb="120,20,60"
+                    zone-divider="255,255,255" outline="0,0,0,0" width="955" height="14"
+                    mode="solid" indicator="255,255,255" indicator-width="5" inactive-alpha="0.3"
+                    outline-width="0" />
+            </translate>
+            <!-- Labels Z1-Z7 -->
+            <component type="text" x="131" y="106" size="14" align="centre" rgb="26,158,92" outline="0,0,0,0">Z1</component>
+            <component type="text" x="310" y="106" size="14" align="centre" rgb="128,185,60" outline="0,0,0,0">Z2</component>
+            <component type="text" x="394" y="106" size="14" align="centre" rgb="232,194,32" outline="0,0,0,0">Z3</component>
+            <component type="text" x="466" y="106" size="14" align="centre" rgb="224,120,32" outline="0,0,0,0">Z4</component>
+            <component type="text" x="537" y="106" size="14" align="centre" rgb="214,53,53" outline="0,0,0,0">Z5</component>
+            <component type="text" x="645" y="106" size="14" align="centre" rgb="180,30,30" outline="0,0,0,0">Z6</component>
+            <component type="text" x="836" y="106" size="14" align="centre" rgb="120,20,60" outline="0,0,0,0">Z7</component>
+        </translate>
+
+        <!-- Speed Card (ancho completo, debajo de Power) -->
+        <translate x="0" y="330">
             <frame width="980" height="100" bg="30,33,38" cr="10" opacity="0.8" />
             <frame x="12" y="12" width="28" height="28" bg="249,115,22,255" cr="5" opacity="0.15" />
             <component type="icon" x="14" y="14" file="speedometer-variant-tool-symbol.png" size="22" />
@@ -77,7 +118,7 @@
 
         <!-- Fila: Gradient (izq) + Cadence (der) -->
         <!-- Gradient Card -->
-        <translate x="0" y="290">
+        <translate x="0" y="440">
             <frame width="480" height="100" bg="30,33,38" cr="10" opacity="0.8" />
             <frame x="12" y="12" width="28" height="28" bg="96,165,250,255" cr="5" opacity="0.15" />
             <component type="icon" x="14" y="14" file="slope-triangle.png" size="22" />
@@ -91,7 +132,7 @@
         </translate>
 
         <!-- Cadence Card -->
-        <translate x="500" y="290">
+        <translate x="500" y="440">
             <frame width="480" height="100" bg="30,33,38" cr="10" opacity="0.8" />
             <frame x="12" y="12" width="28" height="28" bg="167,139,250,255" cr="5" opacity="0.15" />
             <component type="icon" x="14" y="14" file="gauge.png" size="22" />
