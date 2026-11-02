@@ -27,7 +27,7 @@ echo Salida: %OUTPUT_NAME%
 echo Segmentos en paralelo: %JOBS%
 
 python "%PROJECT_DIR%\bin\gopro-dashboard.py" ^
-  --font "%PROJECT_DIR%\fonts\Inter_28pt-Bold.ttf" ^
+  --font "%PROJECT_DIR%\fonts\BarlowCondensed-ExtraBoldItalic.ttf" ^
   --use-gpx-only ^
   --gpx "%GPX_FILE%" ^
   --profile overlay-capcut ^
@@ -36,4 +36,4 @@ python "%PROJECT_DIR%\bin\gopro-dashboard.py" ^
   --units-speed kph ^
   --jobs %JOBS% ^
   --exclude temperature,moving_map ^
-  --layout-xml "%PROJECT_DIR%\gopro_overlay\layouts\Bici_4k_3840x2160.xml"
+  --layout-xml "%PROJECT_DIR%\gopro_overlay\layouts\Bici_4k_Propuesta_3840x2160.xml"
