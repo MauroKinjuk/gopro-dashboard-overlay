@@ -244,7 +244,9 @@ if __name__ == "__main__":
                         generate = "overlay"
 
                     if args.duration:
-                        duration = timeunits(seconds=float(args.duration))
+                        # framemeta must cover up to render_start + duration: render_start
+                        # then seeks inside this meta in the render loop below
+                        duration = timeunits(seconds=float(args.duration + (args.render_start or 0)))
 
                     if args.start_date:
                         start_date = datetime.datetime.fromisoformat(args.start_date)
