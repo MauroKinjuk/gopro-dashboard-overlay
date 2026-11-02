@@ -1,0 +1,91 @@
+<?xml version='1.0' encoding='utf-8'?>
+<layout>
+
+    <!-- Fuentes Barlow Condensed:
+         ExtraBold Italic: velocidad (fuente por defecto, sin atributo font)
+         Bold (upright):   font="BarlowCondensed-Bold.ttf"
+         SemiBold(upright):font="BarlowCondensed-SemiBold.ttf" -->
+
+    <!-- Mapa del circuito - arriba derecha (fondo = silueta de la ruta, marcador = flecha con rumbo) -->
+    <translate x="3280" y="60">
+        <component type="cairo_circuit_map" size="560" fill="34,196,230" outline="0,0,0,0" line-width="0.015"
+            loc-fill="255,255,255" loc-outline="20,20,20" loc-size="0.035" loc-type="arrow" rotate="0"
+            halo="22,24,28,200" halo-width="0.09" />
+    </translate>
+
+    <!-- Barra superior centrada: Transcurrido + Perfil elevación + Distancia -->
+    <translate x="1020" y="30">
+        <frame width="1800" height="170" bg="22,24,28" cr="24" opacity="0.85" />
+
+        <!-- Transcurrido (label SemiBold, valor Bold; centrados entre sí) -->
+        <component type="text" x="135" y="32" size="28" align="centre" rgb="150,155,160" outline="0,0,0,0" font="BarlowCondensed-SemiBold.ttf">TRANSCURRIDO</component>
+        <component type="elapsed" x="135" y="72" size="62" align="centre" rgb="255,255,255" font="BarlowCondensed-Bold.ttf" />
+
+        <!-- Perfil de elevación del recorrido completo (ventana 8h centrada = ruta entera, marcador = posición) -->
+        <translate x="400" y="28">
+            <component type="chart" metric="alt" units="metres" width="1000" height="115"
+                seconds="28800" samples="400" filled="true" values="false" smooth="15"
+                bg="0,0,0,0" fill="34,196,230,180" fill-future="110,115,120,150" line="34,196,230" marker-size="8" />
+        </translate>
+
+        <!-- Distancia (label SemiBold, valores Bold; "/ total km" pegado al número, grupo anclado a la derecha) -->
+        <translate x="1440" y="30">
+            <component type="text" x="300" y="2" size="28" align="right" rgb="150,155,160" outline="0,0,0,0" font="BarlowCondensed-SemiBold.ttf">DISTANCIA</component>
+            <component type="metric" metric="odo" units="km" dp="1" x="300" y="42" size="64" rgb="255,255,255" font="BarlowCondensed-Bold.ttf"
+                unit-metric="odo" unit-stat="max" unit-units="km" unit-format="/ {:~.1f}" unit-anchor="end"
+                unit-size="44" unit-rgb="170,170,170" unit-font="BarlowCondensed-Bold.ttf" unit-gap="14" />
+        </translate>
+    </translate>
+
+    <!-- Métricas principales - abajo izquierda (sin tarjeta, directo sobre el vídeo) -->
+
+    <!-- Velocidad grande a la derecha de FC/Potencia (ExtraBold Italic = fuente por defecto) -->
+    <translate x="640" y="1370">
+        <component type="metric" metric="speed" units="kph" dp="0" x="0" y="0" size="460" align="left" rgb="255,255,255" />
+        <component type="text" x="5" y="490" size="60" align="left" rgb="34,196,230" outline="0,0,0,0">KM/H</component>
+    </translate>
+
+    <!-- FC: número + zona en Bold (color dinámico por zona), "BPM" en SemiBold -->
+    <translate x="110" y="1430">
+        <component type="metric" metric="hr" dp="0" x="0" y="0" size="230" align="left" rgb="242,163,60" font="BarlowCondensed-Bold.ttf"
+            unit="BPM" unit-size="55" unit-rgb="200,200,200" unit-font="BarlowCondensed-SemiBold.ttf" unit-gap="15"
+            z1="118" z2="137" z3="157" z4="176"
+            z0-rgb="26,158,92" z1-rgb="232,194,32" z2-rgb="224,120,32" z3-rgb="214,53,53" z4-rgb="180,30,30" />
+        <component type="zone_name" metric="hr" x="5" y="240" z1="118" z2="137" z3="157" z4="176"
+            zone-0-name="Z1 · RECUPERACIÓN" zone-1-name="Z2 · AERÓBICO" zone-2-name="Z3 · UMBRAL"
+            zone-3-name="Z4 · ANAERÓBICO" zone-4-name="Z5 · VO2 MÁX"
+            z0-rgb="26,158,92" z1-rgb="232,194,32" z2-rgb="224,120,32" z3-rgb="214,53,53" z4-rgb="180,30,30"
+            size="40" align="left" rgb="242,163,60" outline="0,0,0,130" font="BarlowCondensed-Bold.ttf" />
+    </translate>
+
+    <!-- Potencia: número + zona en Bold (color dinámico por zona), "W" en SemiBold -->
+    <translate x="110" y="1680">
+        <component type="metric" metric="power" dp="0" x="0" y="0" size="230" align="left" rgb="52,199,89" font="BarlowCondensed-Bold.ttf"
+            unit="W" unit-size="55" unit-rgb="200,200,200" unit-font="BarlowCondensed-SemiBold.ttf" unit-gap="15"
+            z1="110" z2="150" z3="180" z4="210" z5="240" z6="300"
+            z0-rgb="26,158,92" z1-rgb="128,185,60" z2-rgb="232,194,32" z3-rgb="224,120,32"
+            z4-rgb="214,53,53" z5-rgb="180,30,30" z6-rgb="120,20,60" />
+        <component type="zone_name" metric="power" x="5" y="240" z1="110" z2="150" z3="180" z4="210" z5="240" z6="300"
+            zone-0-name="Z1 · RECUPERACIÓN" zone-1-name="Z2 · RESISTENCIA" zone-2-name="Z3 · TEMPO"
+            zone-3-name="Z4 · UMBRAL" zone-4-name="Z5 · VO2 MÁX" zone-5-name="Z6 · ANAERÓBICO" zone-6-name="Z7 · SPRINT"
+            z0-rgb="26,158,92" z1-rgb="128,185,60" z2-rgb="232,194,32" z3-rgb="224,120,32"
+            z4-rgb="214,53,53" z5-rgb="180,30,30" z6-rgb="120,20,60"
+            size="40" align="left" rgb="52,199,89" outline="0,0,0,130" font="BarlowCondensed-Bold.ttf" />
+    </translate>
+
+    <!-- Fila inferior: cadencia / pendiente / elevación (todo SemiBold, unidades siguen al número) -->
+    <translate x="110" y="1990">
+        <component type="text" x="0" y="22" size="38" align="left" rgb="150,155,160" outline="0,0,0,0" font="BarlowCondensed-SemiBold.ttf">CAD</component>
+        <component type="metric" metric="cadence" dp="0" x="85" y="0" size="60" align="left" rgb="255,255,255" font="BarlowCondensed-SemiBold.ttf"
+            unit="rpm" unit-size="36" unit-rgb="150,155,160" unit-gap="14" />
+
+        <component type="text" x="360" y="22" size="38" align="left" rgb="150,155,160" outline="0,0,0,0" font="BarlowCondensed-SemiBold.ttf">PEND</component>
+        <component type="metric" metric="gradient" dp="1" x="465" y="0" size="60" align="left" rgb="255,255,255" font="BarlowCondensed-SemiBold.ttf"
+            unit="°" unit-size="36" unit-rgb="150,155,160" unit-gap="14" />
+
+        <component type="text" x="740" y="22" size="38" align="left" rgb="150,155,160" outline="0,0,0,0" font="BarlowCondensed-SemiBold.ttf">ELEV</component>
+        <component type="metric" metric="alt" units="metres" dp="0" x="840" y="0" size="60" align="left" rgb="255,255,255" font="BarlowCondensed-SemiBold.ttf"
+            unit="m" unit-size="36" unit-rgb="150,155,160" unit-gap="14" />
+    </translate>
+
+</layout>

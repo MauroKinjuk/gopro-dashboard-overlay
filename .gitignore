@@ -37,3 +37,12 @@ tests/**/*.diff_over_approved.png
 *.mov
 segments_timed.json
 /.segment_work_test
+
+# local preview/dev artifacts
+bin/_preview_*.py
+bin/frame_preview.png
+bin/segment_anim*.png
+bin/segment_anim.gif
+bin/segment_go_frame.png
+bin/nul
+bin/segments_granfondo.json

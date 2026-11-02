@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='utf-8'?>
+<layout>
+
+    <!-- Ejemplo: Distancia total de la actividad (odo stat="max" = km máximos del .fit) -->
+    <translate x="1370" y="880">
+        <frame width="1060" height="400" bg="30,33,38" cr="10" opacity="0.8" />
+
+        <!-- Label -->
+        <component type="text" x="530" y="40" size="34" align="centre" rgb="180,180,180" outline="0,0,0,0">DISTANCIA TOTAL</component>
+
+        <!-- Valor máximo del recorrido: 45.7 -->
+        <component type="metric" metric="odo" units="km" stat="max" dp="1" x="530" y="90" size="160" align="centre" />
+
+        <!-- Unidad -->
+        <component type="text" x="530" y="280" size="44" align="centre" rgb="96,165,250" outline="0,0,0,130">km</component>
+    </translate>
+
+    <!-- Bonus: odo actual vs máximo -->
+    <translate x="1370" y="1330">
+        <frame width="1060" height="170" bg="30,33,38" cr="10" opacity="0.8" />
+        <component type="metric" metric="odo" units="km" dp="1" x="60" y="55" size="60" align="left" />
+        <component type="text" x="230" y="72" size="40" align="left" rgb="160,160,160" outline="0,0,0,0"> / </component>
+        <component type="metric" metric="odo" units="km" stat="max" dp="1" x="280" y="72" size="40" align="left" rgb="160,160,160" outline="0,0,0,0" />
+        <component type="text" x="400" y="80" size="34" align="left" rgb="160,160,160" outline="0,0,0,0"> km</component>
+        <translate x="60" y="140">
+            <component type="bar" metric="odo" units="km" width="940" height="12" min="0" max="auto"
+                outline-width="0" bar="96,165,250" h-pos="96,165,250" fill="120,120,120" zero="0,0,0,0" cr="6" />
+        </translate>
+    </translate>
+
+</layout>
