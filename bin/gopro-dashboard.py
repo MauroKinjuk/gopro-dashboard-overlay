@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import datetime
 import math
+import re
 import subprocess
 import sys
+import time
 from importlib import metadata
 from importlib.metadata import PackageNotFoundError
 from pathlib import Path
@@ -124,6 +126,45 @@ def render_parallel(args, ffmpeg: FFMPEG, total_seconds: float):
                + argv[:out_idx] + [str(part)] + argv[out_idx + 1:]
                + ["--render-start", str(start), "--duration", str(min(seg, end - start)), "--jobs", "1"])
         procs.append(subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT))
+
+    # progress monitor: segments write their progress to .partN.log; we poll
+    # the last "Render: N [P%] [R/s]" line of each and print an aggregate
+    log_paths = [Path(lf.name) for lf in logs]
+    expected = [max(int(min(seg, end - (base + i * seg)) * 10), 1) for i in range(n_parts)]
+    total_expected = max(sum(expected), 1)
+
+    def read_progress(path: Path):
+        try:
+            with open(path, "rb") as f:
+                f.seek(0, 2)
+                f.seek(max(0, f.tell() - 65536))
+                tail = f.read().decode("utf-8", errors="replace")
+            m = re.findall(r"Render:\s*([\d,]+)\s*\[\s*(\d+)%\]\s*\[\s*([\d.]+)/s\]", tail)
+            if m:
+                frames, pct, rate = m[-1]
+                return int(frames.replace(",", "")), int(pct), float(rate)
+        except OSError:
+            pass
+        return None
+
+    announced = False
+    while any(p.poll() is None for p in procs):
+        stats = [read_progress(lp) for lp in log_paths]
+        if any(stats):
+            done = sum(s[0] for s in stats if s)
+            rate = sum(s[2] for s in stats if s)
+            pct = sum((s[1] if s else 0) * e for s, e in zip(stats, expected)) / total_expected
+            eta = max(total_expected - done, 0) / rate if rate > 0 else 0
+            h, rem = divmod(int(eta), 3600)
+            parts_str = " ".join(f"part{i}:{f'{s[1]}%' if s else '...'}" for i, s in enumerate(stats))
+            sys.stdout.write(f"\rRender: {pct:5.1f}% [{rate:5.1f}/s] ETA {h}:{rem // 60:02d}:{rem % 60:02d}   {parts_str}   ")
+            sys.stdout.flush()
+            announced = False
+        elif not announced:
+            log("Waiting for render segments to start...")
+            announced = True
+        time.sleep(2)
+    print()
 
     failed = []
     for p, lf, part in zip(procs, logs, parts):
