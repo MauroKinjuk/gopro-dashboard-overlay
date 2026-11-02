@@ -76,8 +76,12 @@ if exist "%SEGMENTS_FILE%" (
     exit /b 1
 )
 
+REM Segmentos de render en paralelo (cada uno con su ffmpeg). 1 = desactivado
+if "%JOBS%"=="" set "JOBS=3"
+
 echo [OK] Generando overlay con FONDO TRANSPARENTE... (esto puede tomar varios minutos)
 echo   Codec: QuickTime Animation (Alpha)
+echo   Segmentos en paralelo: %JOBS%
 echo.
 
 python "%PROJECT_DIR%\bin\gopro-dashboard.py" ^
@@ -88,6 +92,7 @@ python "%PROJECT_DIR%\bin\gopro-dashboard.py" ^
   --overlay-size 1920x1080 ^
   "%OUTPUT_NAME%" ^
   --units-speed kph ^
+  --jobs %JOBS% ^
   --layout xml ^
   --layout-xml "%LAYOUT_FILE%" ^
   --include segment_overlay

@@ -2,9 +2,11 @@ import ctypes
 import io
 import multiprocessing
 import os
+import queue
+import threading
 from io import BufferedWriter
 from multiprocessing.shared_memory import SharedMemory
-from typing import Callable, Any, Tuple
+from typing import Callable, Any, Optional, Tuple
 
 from PIL import Image, ImageDraw
 
@@ -15,6 +17,47 @@ from gopro_overlay.widgets.widgets import SimpleFrameSupplier
 class DrawBuffer:
     def draw(self, f: Callable[[Image.Image], Any]):
         raise NotImplementedError()
+
+
+class ThreadedWriter:
+    """Pushes frame writes onto a background thread so the draw loop doesn't
+    block waiting for ffmpeg to drain the pipe. os.write releases the GIL,
+    so this overlaps pipe I/O with drawing. Bounded queue keeps backpressure
+    and limits memory use."""
+
+    def __init__(self, writer: BufferedWriter, depth: int = 2):
+        self.writer = writer
+        self.error: Optional[Exception] = None
+        self.queue: queue.Queue = queue.Queue(maxsize=depth)
+        self.thread = threading.Thread(target=self._worker, daemon=True)
+        self.thread.start()
+
+    def _worker(self):
+        while True:
+            item = self.queue.get()
+            if item is None:
+                return
+            try:
+                self.writer.write(item)
+                self.writer.flush()
+            except Exception as e:
+                self.error = e
+                return
+
+    def write(self, data):
+        while self.error is None:
+            try:
+                self.queue.put(data, timeout=0.5)
+                return
+            except queue.Full:
+                pass
+        raise self.error
+
+    def close(self):
+        self.queue.put(None)
+        self.thread.join()
+        if self.error is not None:
+            raise self.error
 
 
 class SingleBuffer(DrawBuffer):
@@ -31,7 +74,8 @@ class SingleBuffer(DrawBuffer):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
+        if isinstance(self.writer, ThreadedWriter):
+            self.writer.close()
 
 
 class SerialisedWriter(io.BufferedWriter):
