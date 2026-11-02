@@ -20,6 +20,8 @@ class SimpleChart(Widget):
             fill=(91, 113, 146),
             line=(255, 255, 255),
             text=(255, 255, 255),
+            smooth=1,
+            fill_future=None,
     ):
         self.value = value
         self.filled = filled
@@ -33,6 +35,8 @@ class SimpleChart(Widget):
         self.bg = bg
         self.line = line
         self.text = text
+        self.smooth = smooth
+        self.fill_future = fill_future
 
         self.view = None
         self.chart_image = None  # cached body without marker
@@ -64,6 +68,13 @@ class SimpleChart(Widget):
         if not (self.view and self.view.version == view.version):
             self.view = view
             data = view.data
+            if self.smooth > 1:
+                half = self.smooth // 2
+                smoothed = []
+                for i in range(len(data)):
+                    seg = [v for v in data[max(0, i - half):i + half + 1] if v is not None]
+                    smoothed.append(sum(seg) / len(seg) if seg else None)
+                data = smoothed
             n = len(data)
             render_width = self.width if self.width is not None else n
             size = (render_width, self.height)
@@ -93,14 +104,33 @@ class SimpleChart(Widget):
                 self._x_scale = render_width / n if n > 0 else 1
 
             points = [(self._x_pos(i), self._y_pos(y)) for i, y in filtered]
+            baseline = size[1] - 1
 
-            if self.filled and len(points) >= 2:
-                baseline = size[1] - 1
-                poly = points + [(points[-1][0], baseline), (points[0][0], baseline)]
-                chart_draw.polygon(poly, fill=self.fill)
+            if self.fill_future is not None:
+                # two-tone: data up to "now" (centre of window) in `fill`, the rest in `fill_future`
+                mid = n // 2
+                past = [pt for pt, (i, _) in zip(points, filtered) if i <= mid]
+                future = [pt for pt, (i, _) in zip(points, filtered) if i >= mid]
+                if self.filled:
+                    if len(future) >= 2:
+                        chart_draw.polygon(
+                            future + [(future[-1][0], baseline), (future[0][0], baseline)],
+                            fill=self.fill_future)
+                    if len(past) >= 2:
+                        chart_draw.polygon(
+                            past + [(past[-1][0], baseline), (past[0][0], baseline)],
+                            fill=self.fill)
+                if len(future) >= 2:
+                    chart_draw.line(future, width=2, fill=self.fill_future)
+                if len(past) >= 2:
+                    chart_draw.line(past, width=2, fill=self.line)
+            else:
+                if self.filled and len(points) >= 2:
+                    poly = points + [(points[-1][0], baseline), (points[0][0], baseline)]
+                    chart_draw.polygon(poly, fill=self.fill)
 
-            if len(points) >= 2:
-                chart_draw.line(points, width=2, fill=self.line)
+                if len(points) >= 2:
+                    chart_draw.line(points, width=2, fill=self.line)
 
             if self.font:
                 chart_draw.text((10, 4), f"{max_val:.0f}", font=self.font, fill=self.text,

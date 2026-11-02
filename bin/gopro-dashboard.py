@@ -179,13 +179,24 @@ if __name__ == "__main__":
                     else:
                         generate = "overlay"
 
+                    if args.duration:
+                        duration = timeunits(seconds=float(args.duration))
+
+                    if args.start_date:
+                        start_date = datetime.datetime.fromisoformat(args.start_date)
+                        if start_date.tzinfo is None:
+                            start_date = start_date.replace(tzinfo=datetime.timezone.utc)
+
+                    if start_date is not None and duration is not None:
+                        end_date = start_date + duration.timedelta()
+
                     external_file: Path = assert_file_exists(args.gpx)
                     fit_or_gpx_timeseries = load_external(external_file, units)
 
                     log(f"GPX/FIT file:     {fmtdt(fit_or_gpx_timeseries.min)} -> {fmtdt(fit_or_gpx_timeseries.max)}")
 
                     # Give a bit of information here about what is going on
-                    if start_date is not None:
+                    if end_date is not None:
                         log(f"Video File Dates: {fmtdt(start_date)} -> {fmtdt(end_date)}")
 
                         overlap = DateRange(start=start_date, end=end_date).overlap_seconds(

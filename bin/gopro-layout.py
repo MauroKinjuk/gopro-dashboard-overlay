@@ -33,9 +33,10 @@ from gopro_overlay.ffmpeg_gopro import FFMPEGGoPro
 from gopro_overlay.font import load_font
 from gopro_overlay.framemeta_gpmd import LoadFlag
 from gopro_overlay.geo import MapRenderer, api_key_finder, MapStyler
+from gopro_overlay.framemeta_gpx import timeseries_to_framemeta
 from gopro_overlay.layout import Overlay
 from gopro_overlay.layout_xml import layout_from_xml, load_xml_layout
-from gopro_overlay.loading import GoproLoader
+from gopro_overlay.loading import GoproLoader, load_external
 from gopro_overlay.log import log
 from gopro_overlay.privacy import NoPrivacyZone
 from gopro_overlay.timeunits import timeunits
@@ -99,6 +100,7 @@ if __name__ == "__main__":
     parser.add_argument("--font", help="Selects a font", default="Roboto-Medium.ttf")
     parser.add_argument("--overlay-size", default="1920x1080", help="Size of frame, XxY, e.g. 1920x1080")
     parser.add_argument("--gopro", type=pathlib.Path, help="Use gopro video to supply a background image / journey")
+    parser.add_argument("--gpx", type=pathlib.Path, help="Use GPX/FIT file to supply real journey data")
 
     args = parser.parse_args()
 
@@ -125,7 +127,20 @@ if __name__ == "__main__":
 
     ffmpeg_gopro = FFMPEGGoPro(FFMPEG(args.ffmpeg_dir))
 
-    if args.gopro:
+    if args.gpx:
+        external_file = assert_file_exists(args.gpx)
+        gpx_timeseries = load_external(external_file, units)
+
+        log(f"GPX/FIT file: {gpx_timeseries.min} -> {gpx_timeseries.max}")
+
+        dimensions = dimension_from(args.overlay_size)
+        timeseries = timeseries_to_framemeta(gpx_timeseries, units)
+
+        timeseries.process_deltas(timeseries_process.calculate_speeds(), skip=30)
+        timeseries.process(timeseries_process.calculate_odo())
+        timeseries.process_deltas(timeseries_process.calculate_gradient(), skip=30)
+
+    elif args.gopro:
         inputpath = assert_file_exists(args.gopro)
 
         loader = GoproLoader(

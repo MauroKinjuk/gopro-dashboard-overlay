@@ -17,6 +17,7 @@ from gopro_overlay.timeseries import Entry
 from gopro_overlay.timeunits import timeunits
 from gopro_overlay.units import units
 from .exceptions import Defect
+from .font import load_font
 from .layout_xml_attribute import allow_attributes
 from .log import log
 from .widgets.asi import AirspeedIndicator
@@ -30,6 +31,7 @@ from .widgets.gradient_bar import GradientBar
 from .widgets.map import MovingJourneyMap, Circuit
 from .widgets.profile import WidgetProfiler
 from .widgets.segment_overlay import SegmentOverlayWidget
+from .widgets.text import TextWithSuffix
 from .widgets.widgets import simple_icon, Translate, Composite, Frame, Widget
 
 
@@ -111,10 +113,19 @@ def layout_from_xml(xml, renderer, framemeta, font, privacy, include=lambda name
 
     fonts = {}
 
-    def font_at(size):
+    def font_at(size, font_name=None):
         if size <= 0:
             raise ValueError("font size must be positive")
-        return fonts.setdefault(size, font.font_variant(size=size))
+        key = (font_name, size)
+        if key not in fonts:
+            if font_name is None:
+                fonts[key] = font.font_variant(size=size)
+            else:
+                candidate = Path(font_name)
+                if not candidate.exists():
+                    candidate = Path(font.path).parent / font_name
+                fonts[key] = load_font(str(candidate), size=size)
+        return fonts[key]
 
     factory = Widgets(
         font=font_at,
@@ -328,6 +339,13 @@ def quantity_formatter_for(format_string: Optional[str], dp: Optional[int]) -> C
         if format_string == "pace":
             # pace is in minutes, and we want minutes / seconds
             return lambda q: '{:d}:{:02d}'.format(*divmod(math.ceil(60.0 * q.m), 60))
+        elif "{" in format_string:
+            # template format applied to the quantity, e.g. "/ {:~.1f}" -> "/ 45.7 km"
+            try:
+                format_string.format(units.Quantity(0, units.dimensionless))
+            except (ValueError, IndexError, KeyError):
+                raise ValueError(f"Unable to format value with format string {format_string}")
+            return lambda q: format_string.format(q)
         else:
             try:
                 return lambda q: format(q.m, format_string)
@@ -442,10 +460,33 @@ class Widgets:
         return None, None
 
     def _font(self, element, name, d):
-        return self.font(iattrib(element, name, d=d, r=range(1, 2000)))
+        return self.font(iattrib(element, name, d=d, r=range(1, 2000)), attrib(element, "font", d=None))
+
+    def _text_with_suffix(self, element, value_fn):
+        default_fill = rgbattr(element, "rgb", d=(255, 255, 255))
+        return TextWithSuffix(
+            at=at(element),
+            value=value_fn,
+            font=self._font(element, "size", d=16),
+            suffix=attrib(element, "unit"),
+            suffix_font=self.font(
+                iattrib(element, "unit-size", d=iattrib(element, "size", d=16)),
+                attrib(element, "unit-font", d=attrib(element, "font", d=None))
+            ),
+            suffix_fill=rgbattr(element, "unit-rgb", d=default_fill),
+            gap=iattrib(element, "unit-gap", d=10),
+            end_anchored=attrib(element, "unit-anchor", d="after") == "end",
+            fill=default_fill,
+            stroke=rgbattr(element, "outline", d=(0, 0, 0)),
+            stroke_width=iattrib(element, "outline_width", d=2),
+        )
 
     @allow_attributes(
-        {"x", "y", "metric", "size", "format", "dp", "units", "align", "cache", "rgb", "outline", "outline_width", "stat"})
+        {"x", "y", "metric", "size", "format", "dp", "units", "align", "cache", "rgb", "outline",
+         "outline_width", "stat", "font", "unit", "unit-size", "unit-rgb", "unit-font", "unit-gap",
+         "unit-metric", "unit-stat", "unit-units", "unit-format", "unit-dp", "unit-anchor",
+         "z1", "z2", "z3", "z4", "z5", "z6",
+         "z0-rgb", "z1-rgb", "z2-rgb", "z3-rgb", "z4-rgb", "z5-rgb", "z6-rgb"})
     def create_metric(self, element, entry, **kwargs) -> Widget:
         metric_name = attrib(element, "metric")
         units_name = attrib(element, "units", d=None)
@@ -461,6 +502,60 @@ class Widgets:
             else:
                 accessor = lambda e: None
 
+        default_fill = rgbattr(element, "rgb", d=(255, 255, 255))
+        z_thresholds = [iattrib(element, f"z{i}", d=None) for i in range(1, 7)]
+        z_colors = [rgbattr(element, f"z{i}-rgb", d=None) for i in range(7)]
+        fill = default_fill
+        if any(c is not None for c in z_colors):
+            thresholds = [z for z in z_thresholds if z is not None]
+
+            def fill(_acc=metric_accessor_from(metric_name), _thr=thresholds,
+                     _cols=z_colors, _d=default_fill):
+                e = entry()
+                v = _acc(e) if e else None
+                if v is None:
+                    return _d
+                idx = len(_thr)
+                for i, z in enumerate(_thr):
+                    if v.magnitude < z:
+                        idx = i
+                        break
+                return _cols[idx] or _d
+
+        suffix = attrib(element, "unit", d=None)
+        suffix_metric = attrib(element, "unit-metric", d=None)
+        if suffix_metric is not None:
+            s_units = attrib(element, "unit-units", d=None)
+            s_acc = metric_accessor_from(suffix_metric)
+            s_conv = self.converters.converter(s_units)
+            s_stat = attrib(element, "unit-stat", d=None)
+            if s_stat in ("min", "max"):
+                bounds = self._metric_bounds(suffix_metric, s_units)
+                bound = bounds[0 if s_stat == "min" else 1]
+                s_acc = (lambda e, b=bound: b) if bound is not None else (lambda e: None)
+            s_fmt = quantity_formatter_for(attrib(element, "unit-format", d=None),
+                                         iattrib(element, "unit-dp", d=None))
+            suffix = metric_value(entry, s_acc, s_conv, s_fmt, default="")
+
+        if suffix is not None:
+            font = self._font(element, "size", d=16)
+            return TextWithSuffix(
+                at=at(element),
+                value=metric_value(entry, accessor, converter, quantity_formatter_from(element)),
+                font=font,
+                suffix=suffix,
+                end_anchored=attrib(element, "unit-anchor", d="after") == "end",
+                suffix_font=self.font(
+                    iattrib(element, "unit-size", d=iattrib(element, "size", d=16)),
+                    attrib(element, "unit-font", d=attrib(element, "font", d=None))
+                ),
+                suffix_fill=rgbattr(element, "unit-rgb", d=default_fill),
+                gap=iattrib(element, "unit-gap", d=10),
+                fill=fill,
+                stroke=rgbattr(element, "outline", d=(0, 0, 0)),
+                stroke_width=iattrib(element, "outline_width", d=2),
+            )
+
         return metric(
             at=at(element),
             entry=entry,
@@ -470,12 +565,12 @@ class Widgets:
             converter=converter,
             align=attrib(element, "align", d="left"),
             cache=battrib(element, "cache", d=True),
-            fill=rgbattr(element, "rgb", d=(255, 255, 255)),
+            fill=fill,
             stroke=rgbattr(element, "outline", d=(0, 0, 0)),
             stroke_width=iattrib(element, "outline_width", d=2),
         )
 
-    @allow_attributes({"x", "y", "metric", "size", "units", "align", "rgb", "outline", "outline_width"})
+    @allow_attributes({"x", "y", "metric", "size", "units", "align", "rgb", "outline", "outline_width", "font"})
     def create_metric_unit(self, element: ET.Element, entry, **kwargs) -> Widget:
 
         format_string = element.text or "{:~C}"
@@ -503,8 +598,12 @@ class Widgets:
             invert=battrib(element, "invert", d=True)
         )
 
-    @allow_attributes({"x", "y", "size", "format", "truncate", "align", "cache", "rgb", "outline", "outline_width"})
+    @allow_attributes({"x", "y", "size", "format", "truncate", "align", "cache", "rgb", "outline", "outline_width", "font",
+                       "unit", "unit-size", "unit-rgb", "unit-font", "unit-gap", "unit-anchor"})
     def create_datetime(self, element, entry, **kwargs):
+        suffix = attrib(element, "unit", d=None)
+        if suffix is not None:
+            return self._text_with_suffix(element, date_formatter_from_element(element, entry))
         return text(
             at=at(element),
             value=date_formatter_from_element(element, entry),
@@ -516,9 +615,13 @@ class Widgets:
             stroke_width=iattrib(element, "outline_width", d=2)
         )
 
-    @allow_attributes({"x", "y", "size", "format", "align", "cache", "rgb", "outline", "outline_width"})
+    @allow_attributes({"x", "y", "size", "format", "align", "cache", "rgb", "outline", "outline_width", "font",
+                       "unit", "unit-size", "unit-rgb", "unit-font", "unit-gap", "unit-anchor"})
     def create_elapsed(self, element, entry, **kwargs):
         format_string = attrib(element, "format", d="short")
+        suffix = attrib(element, "unit", d=None)
+        if suffix is not None:
+            return self._text_with_suffix(element, elapsed_formatter_from(entry, format_string))
         return text(
             at=at(element),
             value=elapsed_formatter_from(entry, format_string),
@@ -530,7 +633,7 @@ class Widgets:
             stroke_width=iattrib(element, "outline_width", d=2)
         )
 
-    @allow_attributes({"x", "y", "size", "align", "direction", "rgb", "outline", "outline_width"})
+    @allow_attributes({"x", "y", "size", "align", "direction", "rgb", "outline", "outline_width", "font"})
     def create_text(self, element: ET.Element, entry, **kwargs) -> Widget:
         if element.text is None:
             raise IOError("Text components should have the text in the element like <component...>Text</component>")
@@ -627,7 +730,7 @@ class Widgets:
 
     @allow_attributes({"x", "y", "metric", "units", "seconds",
                        "samples", "values", "textsize", "filled",
-                       "height", "width", "marker-size", "bg", "fill", "line", "text"})
+                       "height", "width", "marker-size", "bg", "fill", "fill-future", "line", "text", "smooth"})
     def create_chart(self, element: ET.Element, entry, **kwargs) -> Widget:
         accessor = metric_accessor_from(attrib(element, "metric", d="alt"))
         converter = self.converters.converter(attrib(element, "units", d="metres"))
@@ -666,6 +769,8 @@ class Widgets:
                 fill=rgbattr(element, "fill", d=(91, 113, 146, 170)),
                 line=rgbattr(element, "line", d=(255, 255, 255, 170)),
                 text=rgbattr(element, "text", d=(255, 255, 255, 170)),
+                smooth=iattrib(element, "smooth", d=1),
+                fill_future=rgbattr(element, "fill-future", d=None),
             )
         )
 
@@ -828,7 +933,8 @@ class Widgets:
         )
 
     @allow_attributes({"x", "y", "metric", "z1", "z2", "z3", "z4", "z5", "z6", "size", "align", "rgb", "outline",
-                       "outline_width",
+                       "outline_width", "font",
+                       "z0-rgb", "z1-rgb", "z2-rgb", "z3-rgb", "z4-rgb", "z5-rgb", "z6-rgb",
                        "zone-0-name", "zone-1-name", "zone-2-name", "zone-3-name", "zone-4-name",
                        "zone-5-name", "zone-6-name"})
     def create_zone_name(self, element, entry, **kwargs) -> Widget:
@@ -846,25 +952,35 @@ class Widgets:
             attrib(element, f"zone-{i}-name", d=f"Z{i + 1}") for i in range(len(z_values) + 1)
         ]
 
-        def zone_value() -> str:
+        def zone_index() -> int:
             e = entry()
             if e is None:
-                return zone_names[0]
+                return 0
             v = accessor(e)
             if v is None:
-                return zone_names[0]
+                return 0
             val = v.magnitude
             for i, z in enumerate(z_values):
                 if val < z:
-                    return zone_names[i]
-            return zone_names[-1]
+                    return i
+            return len(z_values)
+
+        def zone_value() -> str:
+            return zone_names[zone_index()]
+
+        default_fill = rgbattr(element, "rgb", d=(255, 255, 255))
+        z_colors = [rgbattr(element, f"z{i}-rgb", d=None) for i in range(len(z_values) + 1)]
+        if any(c is not None for c in z_colors):
+            fill = lambda: z_colors[zone_index()] or default_fill
+        else:
+            fill = default_fill
 
         return text(
             at=at(element),
             value=zone_value,
             font=self._font(element, "size", d=16),
             align=attrib(element, "align", d="left"),
-            fill=rgbattr(element, "rgb", d=(255, 255, 255)),
+            fill=fill,
             stroke=rgbattr(element, "outline", d=(0, 0, 0)),
             stroke_width=iattrib(element, "outline_width", d=2),
         )

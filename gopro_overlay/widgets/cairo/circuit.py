@@ -39,10 +39,12 @@ class CairoCircuitPath(CairoWidget):
             journey_fn: Callable[[], Journey],
             scale_fn: Callable[[Point], Tuple[float, float]],
             line: Line = Line(fill=white, outline=black, width=0.01),
+            halo: Optional[Line] = None,
     ):
         self.journey = journey_fn
         self.scale = scale_fn
         self.line = line
+        self.halo = halo
 
         self._points = None
 
@@ -57,6 +59,13 @@ class CairoCircuitPath(CairoWidget):
                 self._points = rdp([self.scale(p) for p in journey.locations[1:]], epsilon=self.line.width / 8)
 
             [context.line_to(*p) for p in self._points]
+
+            if self.halo is not None:
+                context.set_line_cap(cairo.LineCap.ROUND)
+                context.set_line_join(cairo.LineJoin.ROUND)
+                set_source(context, to_cairo_rgba(self.halo.fill))
+                context.set_line_width(self.halo.width)
+                context.stroke_preserve()
 
             set_source(context, to_cairo_rgba(self.line.outline))
             context.set_line_width(self.line.width)
@@ -119,6 +128,7 @@ class CairoCircuit(CairoWidget):
             line: Line = Line(fill=white, outline=black, width=0.01),
             loc: Line = Line(fill=blue, outline=white, width=0.015),
             azimuth: Callable[[], Optional[float]] = None,
+            halo: Optional[Line] = None,
     ):
         self.framemeta = framemeta
         self._journey = None
@@ -130,7 +140,8 @@ class CairoCircuit(CairoWidget):
                 CairoCircuitPath(
                     self.journey,
                     self.scale,
-                    line
+                    line,
+                    halo=halo,
                 )
             ),
             CairoCircuitLocation(

@@ -33,6 +33,7 @@ class CachingText(Widget):
         cached = self.cache.get(text, None)
 
         if cached is None:
+            fill = self.fill() if callable(self.fill) else self.fill
             x0, y0, x1, y1 = self.font.getbbox(
                 text=text,
                 stroke_width=self.stroke_width,
@@ -54,7 +55,7 @@ class CachingText(Widget):
                 anchor=self.anchor,
                 direction=None if self.direction == "ltr" else self.direction,
                 font=self.font,
-                fill=self.fill,
+                fill=fill,
                 stroke_width=self.stroke_width,
                 stroke_fill=self.stroke
             )
@@ -93,7 +94,7 @@ class Text(Widget):
             anchor=self.anchor,
             direction=None if self.direction == "ltr" else self.direction,
             font=self.font,
-            fill=self.fill,
+            fill=self.fill() if callable(self.fill) else self.fill,
             stroke_width=self.stroke_width,
             stroke_fill=(0, 0, 0)
         )
@@ -104,3 +105,66 @@ anchors = {
     "right": "ra",
     "centre": "ma",
 }
+
+
+class TextWithSuffix(Widget):
+    """Text with a suffix (e.g. a unit) drawn immediately after the value,
+    in its own font/colour and baseline-aligned. The suffix may be a string
+    or a callable returning a string.
+
+    end_anchored=False (default): value is left-anchored at `at`, suffix follows it.
+    end_anchored=True: `at` is the RIGHT edge of the group; the suffix is
+    right-anchored there and the value is right-anchored just before it."""
+
+    def __init__(self, at: Coordinate, value: Callable, font,
+                 suffix, suffix_font, suffix_fill, gap: int = 0,
+                 fill=None, stroke=(0, 0, 0), stroke_width=2,
+                 end_anchored: bool = False):
+        self.at = at
+        self.value = value
+        self.font = font
+        self.suffix = suffix
+        self.suffix_font = suffix_font
+        self.suffix_fill = suffix_fill
+        self.gap = gap
+        self.fill = fill if fill else (255, 255, 255)
+        self.stroke = stroke
+        self.stroke_width = stroke_width
+        self.end_anchored = end_anchored
+
+    def draw(self, image: Image, draw: ImageDraw):
+        value = self.value()
+        if value is None:
+            return
+        text = str(value)
+        suffix = self.suffix() if callable(self.suffix) else self.suffix
+        fill = self.fill() if callable(self.fill) else self.fill
+        suffix_fill = self.suffix_fill() if callable(self.suffix_fill) else self.suffix_fill
+
+        if self.end_anchored:
+            baseline_y = self.at.y + self.font.getmetrics()[0]
+            suffix_w = self.suffix_font.getlength(suffix)
+            draw.text(
+                (self.at.x - suffix_w - self.gap, self.at.y), text, anchor="ra",
+                font=self.font, fill=fill,
+                stroke_width=self.stroke_width, stroke_fill=self.stroke,
+            )
+            draw.text(
+                (self.at.x, baseline_y - self.suffix_font.getmetrics()[0]), suffix, anchor="ra",
+                font=self.suffix_font, fill=suffix_fill,
+                stroke_width=self.stroke_width, stroke_fill=self.stroke,
+            )
+        else:
+            draw.text(
+                self.at.tuple(), text, anchor="la",
+                font=self.font, fill=fill,
+                stroke_width=self.stroke_width, stroke_fill=self.stroke,
+            )
+            baseline_y = self.at.y + self.font.getmetrics()[0]
+            suffix_x = self.at.x + self.font.getlength(text) + self.gap
+            suffix_y = baseline_y - self.suffix_font.getmetrics()[0]
+            draw.text(
+                (suffix_x, suffix_y), suffix, anchor="la",
+                font=self.suffix_font, fill=suffix_fill,
+                stroke_width=self.stroke_width, stroke_fill=self.stroke,
+            )
