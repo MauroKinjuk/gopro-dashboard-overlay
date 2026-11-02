@@ -19,8 +19,12 @@ if "%~2"=="" (
     set "OUTPUT_NAME=%~2"
 )
 
+REM Segmentos de render en paralelo (cada uno con su ffmpeg). 1 = desactivado
+if "%JOBS%"=="" set "JOBS=3"
+
 echo Generando overlay Shorts para: %GPX_FILE%
 echo Salida: %OUTPUT_NAME%
+echo Segmentos en paralelo: %JOBS%
 
 python "%PROJECT_DIR%\bin\gopro-dashboard.py" ^
   --font "%PROJECT_DIR%\Coolvetica.otf" ^
@@ -30,5 +34,6 @@ python "%PROJECT_DIR%\bin\gopro-dashboard.py" ^
   --overlay-size 1080x1920 ^
   "%OUTPUT_NAME%" ^
   --units-speed kph ^
+  --jobs %JOBS% ^
   --exclude temperature,moving_map ^
   --layout-xml "%PROJECT_DIR%\gopro_overlay\layouts\Bici_Shorts_1080x1920.xml"

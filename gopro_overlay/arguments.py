@@ -107,6 +107,8 @@ def gopro_dashboard_arguments(args=None):
                         help="Use ffmpeg options profile <name> from ~/gopro-graphics/ffmpeg-profiles.json")
     render.add_argument("--double-buffer", action="store_true",
                         help="Enable HIGHLY EXPERIMENTAL double buffering mode. May speed things up. May not work at all")
+    render.add_argument("--jobs", type=int, default=1,
+                        help="Render N parallel segments and join them - much faster on multi-core machines")
     render.add_argument("--ffmpeg-dir", type=pathlib.Path,
                         help="Directory where ffmpeg/ffprobe located, default=Look in PATH")
 
@@ -136,6 +138,8 @@ def gopro_dashboard_arguments(args=None):
                       help="Start date/time for GPX-only mode (format: YYYY-MM-DD HH:MM:SS). Overrides video-time-start.")
     only.add_argument("--duration", type=int,
                       help="Duration in seconds for GPX-only mode. Limits output video length.")
+    only.add_argument("--render-start", type=int, default=0,
+                      help="Start rendering this many seconds into the video (for parallel segments or previews)")
 
     maps = parser.add_argument_group("Mapping", "Display of Maps")
 

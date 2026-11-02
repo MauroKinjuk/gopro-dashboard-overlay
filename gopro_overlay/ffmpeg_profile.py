@@ -42,7 +42,7 @@ builtin_profiles = {
     # Perfiles con soporte alpha/transparencia para overlays
     "alpha-qtrle": {
         "input": [],
-        "output": ["-vcodec", "qtrle", "-pix_fmt", "argb"]  # QuickTime Animation con alpha
+        "output": ["-r", "24", "-vcodec", "qtrle", "-pix_fmt", "argb"]  # QuickTime Animation con alpha (video 24fps)
     },
     "alpha-prores": {
         "input": [],
@@ -58,7 +58,11 @@ builtin_profiles = {
     },
     "overlay-capcut": {
         "input": [],
-        "output": ["-r", "30", "-vf", "premultiply_dynamic", "-vcodec", "png", "-pix_fmt", "rgba"]  # PNG con alpha premultiplicado para CapCut
+        "output": ["-r", "24", "-vf", "premultiply_dynamic", "-vcodec", "qtrle", "-pix_fmt", "argb"]  # QuickTime Animation RLE, lossless con alpha para CapCut (video 24fps)
+    },
+    "overlay-capcut-30": {
+        "input": [],
+        "output": ["-r", "30", "-vf", "premultiply_dynamic", "-vcodec", "qtrle", "-pix_fmt", "argb"]  # mismo que overlay-capcut pero para video de 30fps
     }
 }
 

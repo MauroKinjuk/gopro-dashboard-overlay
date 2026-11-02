@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import datetime
+import math
+import subprocess
 import sys
 from importlib import metadata
 from importlib.metadata import PackageNotFoundError
@@ -14,7 +16,7 @@ sys.path.insert(0, str(project_root))
 from gopro_overlay import timeseries_process, gpmd_filters
 from gopro_overlay.arguments import gopro_dashboard_arguments
 from gopro_overlay.assertion import assert_file_exists
-from gopro_overlay.buffering import SingleBuffer, DoubleBuffer
+from gopro_overlay.buffering import SingleBuffer, DoubleBuffer, ThreadedWriter
 from gopro_overlay.common import temp_file_name
 from gopro_overlay.config import Config
 from gopro_overlay.counter import ReasonCounter
@@ -85,6 +87,68 @@ def create_desired_layout(dimensions, layout, layout_xml: Path, include, exclude
 
 def fmtdt(dt: datetime.datetime):
     return dt.replace(microsecond=0).isoformat()
+
+
+def render_parallel(args, ffmpeg: FFMPEG, total_seconds: float):
+    """Render the video as N parallel segments (each a full subprocess writing its
+    own .partN file), then join them with ffmpeg concat - no re-encoding."""
+    jobs = args.jobs
+    base = args.render_start or 0
+    end = min(base + args.duration, math.ceil(total_seconds)) if args.duration else math.ceil(total_seconds)
+    span = end - base
+    if span <= 0:
+        fatal(f"Nothing to render: start={base}s, end={end}s")
+
+    seg = max(1, math.ceil(span / jobs))
+    n_parts = math.ceil(span / seg)
+    log(f"Parallel render: {n_parts} segments of {seg}s each ({base}s -> {end}s)")
+
+    out: Path = args.output
+    argv = sys.argv[1:]
+    out_idx = None
+    for i in range(len(argv) - 1, -1, -1):
+        if not argv[i].startswith("-") and Path(argv[i]) == out:
+            out_idx = i
+            break
+    if out_idx is None:
+        fatal("Unable to locate output file in arguments for parallel render")
+
+    parts, procs, logs = [], [], []
+    for i in range(n_parts):
+        part = out.with_name(f"{out.stem}.part{i}{out.suffix}")
+        parts.append(part)
+        lf = open(out.with_name(f"{out.stem}.part{i}.log"), "w")
+        logs.append(lf)
+        start = base + i * seg
+        cmd = ([sys.executable, str(Path(__file__).resolve())]
+               + argv[:out_idx] + [str(part)] + argv[out_idx + 1:]
+               + ["--render-start", str(start), "--duration", str(min(seg, end - start)), "--jobs", "1"])
+        procs.append(subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT))
+
+    failed = []
+    for p, lf, part in zip(procs, logs, parts):
+        p.wait()
+        lf.close()
+        if p.returncode != 0:
+            failed.append(part.with_suffix(".log"))
+
+    if failed:
+        fatal(f"Parallel render failed - see logs: {', '.join(str(f) for f in failed)}")
+
+    listfile = out.with_suffix(".concat.txt")
+    try:
+        with open(listfile, "w") as f:
+            for part in parts:
+                f.write(f"file '{part.resolve().as_posix()}'\n")
+        ffmpeg.run(["-hide_banner", "-y", "-f", "concat", "-safe", "0",
+                    "-i", str(listfile), "-c", "copy", str(out)])
+        log(f"Joined {n_parts} segments into {out}")
+        for lf in logs:
+            Path(lf.name).unlink(missing_ok=True)
+    finally:
+        listfile.unlink(missing_ok=True)
+        for part in parts:
+            part.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
@@ -264,6 +328,10 @@ if __name__ == "__main__":
             if len(frame_meta) < 1:
                 fatal(f"Unable to load GoPro metadata from {inputpath}. Use --debug-metadata to see more information")
 
+            if args.jobs > 1:
+                render_parallel(args, ffmpeg_exe, video_duration.timedelta().total_seconds())
+                exit(0)
+
             log(f"Generating overlay at {dimensions}")
             log(f"Timeseries has {len(frame_meta)} data points")
             log("Processing....")
@@ -352,6 +420,15 @@ if __name__ == "__main__":
                 stepper = frame_meta.stepper(timeunits(seconds=0.1 * timelapse_correction))
                 progress = ProgressBarProgress("Render")
 
+                render_steps = stepper.steps()
+                total_steps = len(stepper)
+                if args.render_start or args.duration:
+                    rstart = timeunits(seconds=args.render_start or 0)
+                    rend = rstart + timeunits(seconds=args.duration) if args.duration else None
+                    render_steps = [t for t in render_steps
+                                    if t >= rstart and (rend is None or t < rend)]
+                    total_steps = len(render_steps)
+
                 unit_converters = Converters(
                     speed_unit=args.units_speed,
                     distance_unit=args.units_distance,
@@ -376,7 +453,7 @@ if __name__ == "__main__":
                 overlay = Overlay(framemeta=frame_meta, create_widgets=layout_creator)
 
                 try:
-                    progress.start(len(stepper))
+                    progress.start(total_steps)
                     with ffmpeg.generate() as writer:
 
                         if args.double_buffer:
@@ -384,10 +461,10 @@ if __name__ == "__main__":
                                 "Please raise issues if you see it working or not-working. Thanks ***")
                             buffer = DoubleBuffer(dimensions, args.bg, writer)
                         else:
-                            buffer = SingleBuffer(dimensions, args.bg, writer)
+                            buffer = SingleBuffer(dimensions, args.bg, ThreadedWriter(writer))
 
                         with buffer:
-                            for index, dt in enumerate(stepper.steps()):
+                            for index, dt in enumerate(render_steps):
                                 progress.update(index)
                                 draw_timer.time(lambda: buffer.draw(lambda frame: overlay.draw(dt, frame)))
 
