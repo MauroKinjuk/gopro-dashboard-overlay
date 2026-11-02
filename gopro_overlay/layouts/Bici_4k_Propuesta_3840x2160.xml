@@ -81,7 +81,7 @@
 
         <component type="text" x="360" y="22" size="38" align="left" rgb="150,155,160" outline="0,0,0,0" font="BarlowCondensed-SemiBold.ttf">PEND</component>
         <component type="metric" metric="gradient" dp="1" x="465" y="0" size="60" align="left" rgb="255,255,255" font="BarlowCondensed-SemiBold.ttf"
-            unit="°" unit-size="36" unit-rgb="150,155,160" unit-gap="14" />
+            unit="%" unit-size="36" unit-rgb="150,155,160" unit-gap="14" />
 
         <component type="text" x="740" y="22" size="38" align="left" rgb="150,155,160" outline="0,0,0,0" font="BarlowCondensed-SemiBold.ttf">ELEV</component>
         <component type="metric" metric="alt" units="metres" dp="0" x="840" y="0" size="60" align="left" rgb="255,255,255" font="BarlowCondensed-SemiBold.ttf"

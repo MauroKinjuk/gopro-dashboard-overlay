@@ -35,9 +35,13 @@ if not "%~4"=="" (
     set "ALIGN_ARG=--video-time-start video-created"
 )
 
+REM Segmentos de render en paralelo (cada uno con su ffmpeg). 1 = desactivado
+if "%JOBS%"=="" set "JOBS=3"
+
 echo Generando overlay Shorts para video: %VIDEO_FILE%
 echo Usando GPX: %GPX_FILE%
 echo Salida: %OUTPUT_NAME%
+echo Segmentos en paralelo: %JOBS%
 
 python "%PROJECT_DIR%\bin\gopro-dashboard.py" ^
   "%VIDEO_FILE%" ^
@@ -50,5 +54,6 @@ python "%PROJECT_DIR%\bin\gopro-dashboard.py" ^
   --profile overlay-capcut ^
   --overlay-size 1080x1920 ^
   --units-speed kph ^
+  --jobs %JOBS% ^
   --exclude temperature,moving_map ^
   --layout-xml "%PROJECT_DIR%\gopro_overlay\layouts\Bici_Shorts_1080x1920.xml"
