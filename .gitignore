@@ -46,3 +46,4 @@ bin/segment_anim.gif
 bin/segment_go_frame.png
 bin/nul
 bin/segments_granfondo.json
+*.log
